@@ -184,6 +184,6 @@ app.param('word_string', function(req, res, next, id){
 app.listen(3001);
 console.log("Express server listening on port %d in %s mode", app.address().port, app.settings.env);
 
-var repl = require('repl');
+//var repl = require('repl');
 
-repl.start().context.app = Person;
+//repl.start().context.app = Person;
