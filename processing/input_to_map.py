@@ -47,7 +47,7 @@ def get_person_id(conn, name):
         cursor.execute("INSERT INTO person(canonical_name) VALUES (%s) RETURNING id" , (name, ))
         person_id = cursor.fetchone()[0]
         cursor.execute("INSERT INTO person_alias(person_id, name) VALUES (%s, %s)", (person_id, name))
-        print "person %s not found, created new with id #%d" % (name, person_id)
+        #print "person %s not found, created new with id #%d" % (name, person_id)
         return person_id
 
 
@@ -61,7 +61,7 @@ def get_word_id(conn, name):
         cursor.execute("INSERT INTO word(canonical_name) VALUES (%s) RETURNING id" , (name, ))
         word_id = cursor.fetchone()[0]
         cursor.execute("INSERT INTO word_alias(word_id, name) VALUES (%s, %s)", (word_id, name))
-        print "word %s not found, created new with id #%d" % (name, word_id)
+        #print "word %s not found, created new with id #%d" % (name, word_id)
         return word_id
 
 
@@ -84,6 +84,9 @@ def process(conn):
         for word in body.split():
             word_id = get_word_id(conn, word)
             add_person_word(conn, person_id, word_id)
+        # TODO: trim words so that trim(code) == trim(codes) == trim(coding) == trim(codify)
+        #       postgres has this built-in, somewhere
+        # TODO: relate words to other words
         print time, name, body
 
 
@@ -92,11 +95,10 @@ def print_results(conn):
     cursor = conn.cursor()
     cursor.execute("SELECT id, canonical_name FROM person")
     for person_id, person_name in cursor.fetchall():
-        cursor.execute("SELECT word_id, uses FROM person_word WHERE person_id = %s", (person_id, ))
-        for word_id in cursor.fetchall():
-            cursor.execute("SELECT canonical_name, uses FROM person_word JOIN word ON person_word.word_id = word.id WHERE person_id = %s", (person_id, ))
-            for word_name, uses in cursor.fetchall():
-                print person_id, person_name, word_name, uses
+        print "-", person_id, person_name
+        cursor.execute("SELECT word_id, canonical_name, uses FROM person_word JOIN word ON person_word.word_id = word.id WHERE person_id = %s ORDER BY uses DESC", (person_id, ))
+        for word_id, word_name, uses in cursor.fetchall():
+            print uses, word_name
 
 
 def main():
