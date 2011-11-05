@@ -3,6 +3,7 @@
 import psycopg2
 import psycopg2.extras
 import os
+import json
 from Stemmer import Stemmer
 
 stemmer = Stemmer('english')
@@ -15,76 +16,34 @@ def stem(word):
     return stemmer.stemWord(word)
 
 
-def create_input(conn):
-    print "*** Inventing input"
-    cursor = conn.cursor()
-    cursor.execute("DROP TABLE IF EXISTS input")
-    cursor.execute("CREATE TABLE input(time_said time with time zone default current_time, person_name text, speech_text text, source_url text)")
-    for line in file("plain-text-input.txt"):
-        if ":" in line:
-            person, text = line.strip().split(":", 1)
-            cursor.execute("INSERT INTO input(person_name, speech_text) VALUES (%s, %s)", (person, text))
-
-
 def create_processed_tables(conn):
     print "*** Creating blank tables for output"
     cursor = conn.cursor()
 
+    cursor.execute("DROP TABLE IF EXISTS person CASCADE")
+    cursor.execute("CREATE TABLE person(id serial primary key, name text not null)")
 
-    cursor.execute("DROP TABLE IF EXISTS person")
-    cursor.execute("CREATE TABLE person(id serial primary key, canonical_name text not null)")
-    for line in file("aliases.txt"):
-        name, alias = line.strip().split(",")
-        cursor.execute("INSERT INTO person(canonical_name) VALUES(%s)", (name, ))
+    cursor.execute("DROP TABLE IF EXISTS word CASCADE")
+    cursor.execute("CREATE TABLE word(id serial primary key, name text not null)")
+    cursor.execute("CREATE INDEX stemmed_word on word(ts_lexize('english_stem', name))")
 
-    cursor.execute("DROP TABLE IF EXISTS person_alias")
-    cursor.execute("CREATE TABLE person_alias(person_id integer references person(id), name text not null)")
-    for line in file("aliases.txt"):
-        name, alias = line.strip().split(",")
-        cursor.execute("INSERT INTO person_alias(person_id, name) VALUES((SELECT id FROM person WHERE canonical_name=%s), %s)", (name, alias))
-
-
-    cursor.execute("DROP TABLE IF EXISTS word")
-    cursor.execute("CREATE TABLE word(id serial primary key, stemmed_name text not null, canonical_name text not null)")
-
-    #cursor.execute("DROP TABLE IF EXISTS word_alias")
-    #cursor.execute("CREATE TABLE word_alias(word_id integer references word(id), name text not null)")
-
-
-    cursor.execute("DROP TABLE IF EXISTS person_word")
+    cursor.execute("DROP TABLE IF EXISTS person_word CASCADE")
     cursor.execute("CREATE TABLE person_word(person_id integer references person(id), related_word_id integer references word(id), uses integer not null default 0)")
 
-    cursor.execute("DROP TABLE IF EXISTS word_word")
+    cursor.execute("DROP TABLE IF EXISTS word_word CASCADE")
     cursor.execute("CREATE TABLE word_word(word_id integer references word(id), related_word_id integer references word(id), uses integer not null default 0)")
-
-
-def get_person_id(conn, name):
-    cursor = conn.cursor()
-    cursor.execute("SELECT person_id FROM person_alias WHERE name ILIKE %s", (name, ))
-    row = cursor.fetchone()
-    if row:
-        return row[0]
-    else:
-        cursor.execute("INSERT INTO person(canonical_name) VALUES (%s) RETURNING id" , (name, ))
-        person_id = cursor.fetchone()[0]
-        cursor.execute("INSERT INTO person_alias(person_id, name) VALUES (%s, %s)", (person_id, name))
-        #print "person %s not found, created new with id #%d" % (name, person_id)
-        return person_id
 
 
 def get_word_id(conn, name):
     stemmed_name = stem(name)
     cursor = conn.cursor()
-    cursor.execute("SELECT id FROM word WHERE stemmed_name = %s", (stemmed_name, ))
+    cursor.execute("SELECT id FROM word WHERE ts_lexize('english_stem', name) = ts_lexize('english_stem', %s)", (stemmed_name, ))
     row = cursor.fetchone()
     if row:
         return row[0]
     else:
-        cursor.execute("INSERT INTO word(stemmed_name, canonical_name) VALUES (%s, %s) RETURNING id" , (stemmed_name, name, ))
-        word_id = cursor.fetchone()[0]
-        #cursor.execute("INSERT INTO word_alias(word_id, name) VALUES (%s, %s)", (word_id, name))
-        #print "word %s not found, created new with id #%d" % (name, word_id)
-        return word_id
+        cursor.execute("INSERT INTO word(name) VALUES (%s) RETURNING id" , (name, ))
+        return cursor.fetchone()[0]
 
 
 def add_person_word(conn, person_id, word_id):
@@ -100,41 +59,47 @@ def add_person_word(conn, person_id, word_id):
 def process(conn):
     print "*** Processing"
     cursor = conn.cursor()
-    cursor.execute("SELECT time_said, person_name, speech_text FROM input")
-    for time, name, body in cursor:
-        person_id = get_person_id(conn, name)
+    cursor.execute("DELETE FROM person")
+    cursor.execute("INSERT INTO person(id, name) (SELECT DISTINCT speakerid, max(speakername) FROM input GROUP BY speakerid)")
+
+    cursor.execute("SELECT timestamp, speakerid, speakername, text FROM input")
+    for counter, (time, person_id, name, body) in enumerate(cursor):
+        print "processed %d events" % counter
         for word in body.split():
             if word not in stop_words:
                 word_id = get_word_id(conn, word)
                 add_person_word(conn, person_id, word_id)
-        # TODO: trim words so that trim(code) == trim(codes) == trim(coding) == trim(codify)
-        #       postgres has this built-in, somewhere
         # TODO: relate words to other words
-        print time, name, body
+        #print "%s %20s %s" % (time, name, body[:40])
 
 
 def print_results(conn):
     print "*** Results"
     cursor = conn.cursor()
-    cursor.execute("SELECT id, canonical_name FROM person")
+    cursor.execute("SELECT id, name FROM person")
     for person_id, person_name in cursor.fetchall():
         print "-", person_name
-        cursor.execute("SELECT related_word_id, canonical_name, stemmed_name, uses FROM person_word JOIN word ON person_word.related_word_id = word.id WHERE person_id = %s ORDER BY uses DESC", (person_id, ))
-        for word_id, word_name, stemmed_name, uses in cursor.fetchall():
-            print uses, word_name, stemmed_name
+        cursor.execute("""
+            SELECT related_word_id, name, uses
+            FROM person_word JOIN word ON person_word.related_word_id = word.id
+            WHERE person_id = %s
+            ORDER BY uses DESC
+            LIMIT 10
+        """, (person_id, ))
+        for word_id, word_name, uses in cursor.fetchall():
+            print uses, word_name
+            pass
 
 
 def main():
     conn_string = "host='localhost' dbname='%(user)s' user='%(user)s' password='%(user)s'" % {'user': os.environ['USER']}
     conn = psycopg2.connect(conn_string)
 
-    create_input(conn)
     create_processed_tables(conn)
     process(conn)
     print_results(conn)
-    conn.commit()
 
-#conn.commit()
+    conn.commit()
 
 if __name__ == "__main__":
     main()
