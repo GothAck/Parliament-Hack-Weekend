@@ -1,0 +1,8 @@
+<h1>Search Results</h1>
+<ul>
+  {{each words}}
+    <li>
+      <a href="/word/${$value.id}">${$value.canonical_name}</a> 
+    </li>
+  {{/each}}
+</ul>

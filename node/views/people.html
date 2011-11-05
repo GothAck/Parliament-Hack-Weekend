@@ -1,0 +1,8 @@
+<h1>Search Results</h1>
+<ul>
+  {{each people}}
+    <li>
+      <a href="/person/${$value.id}">${$value.canonical_name}</a> 
+    </li>
+  {{/each}}
+</ul>
