@@ -1,8 +1,12 @@
 import argparse
 import urllib2
 import os
+<<<<<<< HEAD
 import json
 import datetime
+=======
+import psycopg2
+>>>>>>> 50ff15489d7f236d748bf820915848ed9f12ebf3
 from dateutil.parser import parse as parse_date
 from BeautifulSoup import BeautifulSoup
 
@@ -15,9 +19,10 @@ sources      = ['local_only', 'ukparse']
 
 parser = argparse.ArgumentParser(description='Import text data from UK parliment hansard.')
 parser.add_argument('-d', '--date'       , dest='date_import', type=parse_date           , default=datetime.datetime.now(), help='date to import from hansard website')
-parser.add_argument('-o', '--output'     , dest='output'                                                                  , help='the outputfile to write to or postgress for direct postgress')
+parser.add_argument('-o', '--output'     , dest='file_out'                                                                , help='the outputfile to write to')
 parser.add_argument('-r', '--report_type', dest='report_type', choices=report_types      , default='debates'              , help='report type to query from %s' % report_types)
 parser.add_argument('-s'  '--source'     , dest='source'     , choices=sources           , default='local_only'           , help='source of data from %s' % sources)
+parser.add_argument(      '--db'         , dest='db_out'                                                                  , help='output to db')
 args = parser.parse_args()
 
 
@@ -138,6 +143,41 @@ if args.output:
     file = open(args.output, 'w')
     file.write(json.dumps(hansard_data))
     file.close()
+elif args.db_out:
+    conn_string = "host='localhost' dbname='%(user)s' user='%(user)s' password='%(user)s'" % {'user': os.environ['USER']}
+    conn = psycopg2.connect(conn_string)
+    cursor = conn.cursor()
+    cursor.execute("DROP TABLE IF EXISTS input CASCADE")
+    cursor.execute("CREATE TABLE input(speakerid integer, speakername text, url text, text text, context text, timestamp text)")
+
+    def to_id(n):
+        if n.isdigit():
+            return int(n)
+        return -1
+
+    for count, line in enumerate(hansard_data):
+        print "processed %d lines" % count
+        cursor.execute(
+            """
+                INSERT INTO input(
+                    timestamp,
+                    speakerid,
+                    speakername,
+                    text,
+                    context,
+                    url
+                )
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                line["timestamp"],
+                to_id(line['speakerid'].split("/")[-1]),
+                line['speakername'],
+                line["text"],
+                line["context"],
+                line["url"],
+            )
+        )
+    conn.commit()
 else:
     import pprint
     pprint.pprint(hansard_data)
