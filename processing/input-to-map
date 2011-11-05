@@ -34,16 +34,22 @@ def create_processed_tables(conn):
     cursor.execute("CREATE TABLE word_word(word_id integer references word(id), related_word_id integer references word(id), uses integer not null default 0)")
 
 
+word_id_cache = {}
+
 def get_word_id(conn, name):
+    if name in word_id_cache:
+        return word_id_cache[name]
     stemmed_name = stem(name)
     cursor = conn.cursor()
     cursor.execute("SELECT id FROM word WHERE ts_lexize('english_stem', name) = ts_lexize('english_stem', %s)", (stemmed_name, ))
     row = cursor.fetchone()
     if row:
-        return row[0]
+        word_id = row[0]
     else:
         cursor.execute("INSERT INTO word(name) VALUES (%s) RETURNING id" , (name, ))
-        return cursor.fetchone()[0]
+        word_id = cursor.fetchone()[0]
+    word_id_cache[name] = word_id
+    return word_id
 
 
 def add_person_word(conn, person_id, word_id):
