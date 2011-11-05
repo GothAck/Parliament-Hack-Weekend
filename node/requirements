@@ -9,4 +9,5 @@ Install packages:
 npm install -g express
 npm install -g jqtpl
 npm install -g FastLegS
+sass
 
