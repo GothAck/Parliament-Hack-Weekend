@@ -1,0 +1,13 @@
+
+input(date_said, name, body)
+
+
+
+person(id, canonical_name)
+person_alias(id, name)
+
+word(id, canonical_name)
+word_alias(id, name)
+
+person_word(person_id, word_id, uses)
+word_word(word_id, related_word_id, uses)

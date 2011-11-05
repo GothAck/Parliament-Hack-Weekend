@@ -9,7 +9,7 @@ def create_input(conn):
     cursor = conn.cursor()
     cursor.execute("DROP TABLE IF EXISTS input")
     cursor.execute("CREATE TABLE input(time_said time with time zone default current_time, name text, body text, source text)")
-    for line in file("input-test.txt"):
+    for line in file("plain-text-input.txt"):
         person, text = line.strip().split(" ", 1)
         cursor.execute("INSERT INTO input(name, body) VALUES (%s, %s)", (person, text))
 
@@ -18,23 +18,32 @@ def create_processed_tables(conn):
     print "*** Creating blank tables for output"
     cursor = conn.cursor()
 
+
     cursor.execute("DROP TABLE IF EXISTS person")
     cursor.execute("CREATE TABLE person(id serial primary key, canonical_name text not null)")
+    for line in file("aliases.txt"):
+        name, alias = line.strip().split(",")
+        cursor.execute("INSERT INTO person(canonical_name) VALUES(%s)", (name, ))
+
+    cursor.execute("DROP TABLE IF EXISTS person_alias")
+    cursor.execute("CREATE TABLE person_alias(person_id integer references person(id), name text not null)")
+    for line in file("aliases.txt"):
+        name, alias = line.strip().split(",")
+        cursor.execute("INSERT INTO person_alias(person_id, name) VALUES((SELECT id FROM person WHERE canonical_name=%s), %s)", (name, alias))
+
 
     cursor.execute("DROP TABLE IF EXISTS word")
     cursor.execute("CREATE TABLE word(id serial primary key, canonical_name text not null)")
 
-    cursor.execute("DROP TABLE IF EXISTS person_alias")
-    cursor.execute("CREATE TABLE person_alias(person_id integer references person(id), name text not null)")
-
-    cursor.execute("DROP TABLE IF EXISTS person_word")
-    cursor.execute("CREATE TABLE person_word(person_id integer references person(id), word_id integer references word(id), uses integer not null default 0)")
-
     cursor.execute("DROP TABLE IF EXISTS word_alias")
     cursor.execute("CREATE TABLE word_alias(word_id integer references word(id), name text not null)")
 
+
+    cursor.execute("DROP TABLE IF EXISTS person_word")
+    cursor.execute("CREATE TABLE person_word(person_id integer references person(id), related_word_id integer references word(id), uses integer not null default 0)")
+
     cursor.execute("DROP TABLE IF EXISTS word_word")
-    cursor.execute("CREATE TABLE word_word(word_id integer references word(id), pair_id integer references word(id), uses integer not null default 0)")
+    cursor.execute("CREATE TABLE word_word(word_id integer references word(id), related_word_id integer references word(id), uses integer not null default 0)")
 
 
 def get_person_id(conn, name):
@@ -67,12 +76,12 @@ def get_word_id(conn, name):
 
 def add_person_word(conn, person_id, word_id):
     cursor = conn.cursor()
-    cursor.execute("SELECT uses FROM person_word WHERE person_id=%s AND word_id=%s", (person_id, word_id))
+    cursor.execute("SELECT uses FROM person_word WHERE person_id=%s AND related_word_id=%s", (person_id, word_id))
     row = cursor.fetchone()
     if row:
-        cursor.execute("UPDATE person_word SET uses = uses + 1 WHERE person_id=%s AND word_id=%s", (person_id, word_id))
+        cursor.execute("UPDATE person_word SET uses = uses + 1 WHERE person_id=%s AND related_word_id=%s", (person_id, word_id))
     else:
-        cursor.execute("INSERT INTO person_word (person_id, word_id, uses) VALUES (%s, %s, 1)", (person_id, word_id))
+        cursor.execute("INSERT INTO person_word (person_id, related_word_id, uses) VALUES (%s, %s, 1)", (person_id, word_id))
 
 
 def process(conn):
@@ -95,8 +104,8 @@ def print_results(conn):
     cursor = conn.cursor()
     cursor.execute("SELECT id, canonical_name FROM person")
     for person_id, person_name in cursor.fetchall():
-        print "-", person_id, person_name
-        cursor.execute("SELECT word_id, canonical_name, uses FROM person_word JOIN word ON person_word.word_id = word.id WHERE person_id = %s ORDER BY uses DESC", (person_id, ))
+        print "-", person_name
+        cursor.execute("SELECT related_word_id, canonical_name, uses FROM person_word JOIN word ON person_word.related_word_id = word.id WHERE person_id = %s ORDER BY uses DESC", (person_id, ))
         for word_id, word_name, uses in cursor.fetchall():
             print uses, word_name
 
