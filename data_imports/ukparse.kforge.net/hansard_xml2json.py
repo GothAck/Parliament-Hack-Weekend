@@ -1,12 +1,9 @@
 import argparse
 import urllib2
 import os
-<<<<<<< HEAD
 import json
 import datetime
-=======
 import psycopg2
->>>>>>> 50ff15489d7f236d748bf820915848ed9f12ebf3
 from dateutil.parser import parse as parse_date
 from BeautifulSoup import BeautifulSoup
 
