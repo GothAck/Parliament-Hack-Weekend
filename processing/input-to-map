@@ -52,15 +52,29 @@ def get_word_id(conn, name):
     return word_id
 
 
-def add_person_word(conn, person_id, word_id):
-    cursor = conn.cursor()
-    cursor.execute("SELECT uses FROM person_word WHERE person_id=%s AND related_word_id=%s", (person_id, word_id))
-    row = cursor.fetchone()
-    if row:
-        cursor.execute("UPDATE person_word SET uses = uses + 1 WHERE person_id=%s AND related_word_id=%s", (person_id, word_id))
-    else:
-        cursor.execute("INSERT INTO person_word (person_id, related_word_id, uses) VALUES (%s, %s, 1)", (person_id, word_id))
+person_words = {}
 
+def add_person_word(conn, person_id, word_id):
+    if person_id not in person_words:
+        person_words[person_id] = {}
+    if word_id not in person_words[person_id]:
+        person_words[person_id][word_id] = 0
+    person_words[person_id][word_id] = person_words[person_id][word_id] + 1
+    #cursor = conn.cursor()
+    #cursor.execute("SELECT uses FROM person_word WHERE person_id=%s AND related_word_id=%s", (person_id, word_id))
+    #row = cursor.fetchone()
+    #if row:
+    #    cursor.execute("UPDATE person_word SET uses = uses + 1 WHERE person_id=%s AND related_word_id=%s", (person_id, word_id))
+    #else:
+    #    cursor.execute("INSERT INTO person_word (person_id, related_word_id, uses) VALUES (%s, %s, 1)", (person_id, word_id))
+
+
+def commit_words(conn):
+    cursor = conn.cursor()
+    for person_id in person_words:
+        print "Committing words for person %d" % person_id
+        for word_id in person_words[person_id]:
+            cursor.execute("INSERT INTO person_word (person_id, related_word_id, uses) VALUES (%s, %s, %s)", (person_id, word_id, person_words[person_id][word_id]))
 
 def process(conn):
     print "*** Processing"
@@ -77,6 +91,7 @@ def process(conn):
                 add_person_word(conn, person_id, word_id)
         # TODO: relate words to other words
         #print "%s %20s %s" % (time, name, body[:40])
+    commit_words(conn)
 
 
 def print_results(conn):
@@ -101,8 +116,8 @@ def main():
     conn_string = "host='localhost' dbname='%(user)s' user='%(user)s' password='%(user)s'" % {'user': os.environ['USER']}
     conn = psycopg2.connect(conn_string)
 
-    #create_processed_tables(conn)
-    #process(conn)
+    create_processed_tables(conn)
+    process(conn)
     print_results(conn)
 
     conn.commit()
