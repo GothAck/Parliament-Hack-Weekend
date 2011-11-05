@@ -2,6 +2,7 @@
 
 import psycopg2
 import psycopg2.extras
+import os
 from Stemmer import Stemmer
 
 stemmer = Stemmer('english')
@@ -124,13 +125,14 @@ def print_results(conn):
 
 
 def main():
-    conn_string = "host='localhost' dbname='shish' user='shish' password='shish'"
+    conn_string = "host='localhost' dbname='%(user)s' user='%(user)s' password='%(user)s'" % {'user': os.environ['USER']}
     conn = psycopg2.connect(conn_string)
 
     create_input(conn)
     create_processed_tables(conn)
     process(conn)
     print_results(conn)
+    conn.commit()
 
 #conn.commit()
 
