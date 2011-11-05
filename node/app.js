@@ -4,6 +4,7 @@
  */
 
 var express = require('express');
+var FastLegS = require('FastLegS');
 
 var app = module.exports = express.createServer();
 
@@ -30,12 +31,22 @@ app.configure('production', function(){
   app.use(express.errorHandler()); 
 });
 
+
+
 // Routes
 
 app.get('/', function(req, res){
   res.render('index', {
     title: 'Express'
   });
+});
+
+app.get('/mp/:name', function(req, res){
+
+});
+
+app.get('/mp/:keyword', function(req, res){
+
 });
 
 app.listen(3000);
