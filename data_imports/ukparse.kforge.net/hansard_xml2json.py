@@ -67,7 +67,7 @@ def get_hansard_page_xml(report_type, date, page):
             xml_data = urllib2.urlopen(url, timeout=10).read()
         except urllib2.HTTPError as http_error:
             response = http_error.read()
-        
+        #if xml_data:
         file = open(cached_filename, 'a')
         file.write(xml_data)
         file.close()
@@ -81,7 +81,7 @@ def get_hansard_data(report_type, date, hansard_data=None):
     Hansard dates may take multiple pages
     Attempt the pages from 1 to infinity, exit on http not found error
     """
-    if not hansard_data:
+    if not isinstance(hansard_data, list):
         hansard_data = []
     
     page = 1
@@ -118,6 +118,7 @@ def parse_hansard_xml(xml_data, hansard_data, source_url, date):
             minor_heading = ''
             details       = ''
             major_heading = tag.text
+            #print major_heading
         if name == 'minor-heading':
             minor_heading = tag.text
             
@@ -142,11 +143,13 @@ def parse_hansard_xml(xml_data, hansard_data, source_url, date):
 
 if args.date_range:
     args.date_range = [parse_date(date) for date in args.date_range]
-    day = datetime.timedelta(day=1)
+    day = datetime.timedelta(days=1)
     date = args.date_range[0]
     hansard_data = []
     while date < args.date_range[1]:
+        print "%s - %d total data entries" % (date, len(hansard_data))
         get_hansard_data(args.report_type, date, hansard_data=hansard_data)
+        date += day
     
 elif args.date:
     hansard_data = get_hansard_data(args.report_type, args.date)
