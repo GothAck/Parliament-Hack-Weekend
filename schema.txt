@@ -1,14 +1,9 @@
 
-input(date_said, person_name, speech_text, source_url)
+input(discussion_topic, date_said, person_id, person_name, speech_text, source_url)
 
 
-
-person(id, canonical_name)
-person_alias(id, name)
-
-word(id, stemmed_name, canonical_name)
-# redundant with automatic stemming?
-# word_alias(id, name)
+person(id, name) # , twitter_id)
+word(id, name) # stemmed name is an indexed function
 
 person_word(person_id, related_word_id, uses)
 word_word(word_id, related_word_id, uses)
