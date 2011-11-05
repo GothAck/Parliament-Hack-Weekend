@@ -3,6 +3,17 @@
 import psycopg2
 import psycopg2.extras
 import os
+from Stemmer import Stemmer
+
+stemmer = Stemmer('english')
+stop_words = [w.strip() for w in file("stop-words.txt").readlines()]
+
+def stem(word):
+    word = word.lower()
+    for letter in "!?.,":
+        word = word.replace(letter, "")
+    return stemmer.stemWord(word)
+
 
 def create_input(conn):
     print "*** Inventing input"
@@ -10,8 +21,9 @@ def create_input(conn):
     cursor.execute("DROP TABLE IF EXISTS input")
     cursor.execute("CREATE TABLE input(time_said time with time zone default current_time, person_name text, speech_text text, source_url text)")
     for line in file("plain-text-input.txt"):
-        person, text = line.strip().split(" ", 1)
-        cursor.execute("INSERT INTO input(person_name, speech_text) VALUES (%s, %s)", (person, text))
+        if ":" in line:
+            person, text = line.strip().split(":", 1)
+            cursor.execute("INSERT INTO input(person_name, speech_text) VALUES (%s, %s)", (person, text))
 
 
 def create_processed_tables(conn):
@@ -33,10 +45,10 @@ def create_processed_tables(conn):
 
 
     cursor.execute("DROP TABLE IF EXISTS word")
-    cursor.execute("CREATE TABLE word(id serial primary key, canonical_name text not null)")
+    cursor.execute("CREATE TABLE word(id serial primary key, stemmed_name text not null, canonical_name text not null)")
 
-    cursor.execute("DROP TABLE IF EXISTS word_alias")
-    cursor.execute("CREATE TABLE word_alias(word_id integer references word(id), name text not null)")
+    #cursor.execute("DROP TABLE IF EXISTS word_alias")
+    #cursor.execute("CREATE TABLE word_alias(word_id integer references word(id), name text not null)")
 
 
     cursor.execute("DROP TABLE IF EXISTS person_word")
@@ -61,15 +73,16 @@ def get_person_id(conn, name):
 
 
 def get_word_id(conn, name):
+    stemmed_name = stem(name)
     cursor = conn.cursor()
-    cursor.execute("SELECT word_id FROM word_alias WHERE name ILIKE %s", (name, ))
+    cursor.execute("SELECT id FROM word WHERE stemmed_name = %s", (stemmed_name, ))
     row = cursor.fetchone()
     if row:
         return row[0]
     else:
-        cursor.execute("INSERT INTO word(canonical_name) VALUES (%s) RETURNING id" , (name, ))
+        cursor.execute("INSERT INTO word(stemmed_name, canonical_name) VALUES (%s, %s) RETURNING id" , (stemmed_name, name, ))
         word_id = cursor.fetchone()[0]
-        cursor.execute("INSERT INTO word_alias(word_id, name) VALUES (%s, %s)", (word_id, name))
+        #cursor.execute("INSERT INTO word_alias(word_id, name) VALUES (%s, %s)", (word_id, name))
         #print "word %s not found, created new with id #%d" % (name, word_id)
         return word_id
 
@@ -91,8 +104,9 @@ def process(conn):
     for time, name, body in cursor:
         person_id = get_person_id(conn, name)
         for word in body.split():
-            word_id = get_word_id(conn, word)
-            add_person_word(conn, person_id, word_id)
+            if word not in stop_words:
+                word_id = get_word_id(conn, word)
+                add_person_word(conn, person_id, word_id)
         # TODO: trim words so that trim(code) == trim(codes) == trim(coding) == trim(codify)
         #       postgres has this built-in, somewhere
         # TODO: relate words to other words
@@ -105,9 +119,9 @@ def print_results(conn):
     cursor.execute("SELECT id, canonical_name FROM person")
     for person_id, person_name in cursor.fetchall():
         print "-", person_name
-        cursor.execute("SELECT related_word_id, canonical_name, uses FROM person_word JOIN word ON person_word.related_word_id = word.id WHERE person_id = %s ORDER BY uses DESC", (person_id, ))
-        for word_id, word_name, uses in cursor.fetchall():
-            print uses, word_name
+        cursor.execute("SELECT related_word_id, canonical_name, stemmed_name, uses FROM person_word JOIN word ON person_word.related_word_id = word.id WHERE person_id = %s ORDER BY uses DESC", (person_id, ))
+        for word_id, word_name, stemmed_name, uses in cursor.fetchall():
+            print uses, word_name, stemmed_name
 
 
 def main():
