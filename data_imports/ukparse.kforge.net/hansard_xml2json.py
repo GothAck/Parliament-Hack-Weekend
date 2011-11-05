@@ -15,11 +15,12 @@ sources      = ['local_only', 'ukparse']
 # Argument Parsing -------------------------------------------------------------
 
 parser = argparse.ArgumentParser(description='Import text data from UK parliment hansard.')
-parser.add_argument('-d', '--date'       , dest='date_import', type=parse_date           , default=datetime.datetime.now(), help='date to import from hansard website')
-parser.add_argument('-o', '--output'     , dest='file_out'                                                                , help='the outputfile to write to')
-parser.add_argument('-r', '--report_type', dest='report_type', choices=report_types      , default='debates'              , help='report type to query from %s' % report_types)
-parser.add_argument('-s'  '--source'     , dest='source'     , choices=sources           , default='local_only'           , help='source of data from %s' % sources)
-parser.add_argument(      '--db'         , dest='db_out'                                                                  , help='output to db')
+parser.add_argument('-d' , '--date'       , dest='date'       , type=parse_date           , default=datetime.datetime.now(), help='date to import from hansard website')
+parser.add_argument('-dr', '--date_range' , dest='date_range' , nargs=2                                                    , help='date range to rip from')
+parser.add_argument('-o' , '--output'     , dest='file_out'                                                                , help='the outputfile to write to')
+parser.add_argument('-r' , '--report_type', dest='report_type', choices=report_types      , default='debates'              , help='report type to query from %s' % report_types)
+parser.add_argument('-s '  '--source'     , dest='source'     , choices=sources           , default='local_only'           , help='source of data from %s' % sources)
+parser.add_argument('-db', '--db'         , dest='db_out'                                                                  , help='output to db')
 args = parser.parse_args()
 
 
@@ -73,12 +74,13 @@ def get_hansard_page_xml(report_type, date, page):
         
     return xml_data
 
-def get_hansard_data(report_type, date):
+def get_hansard_data(report_type, date, hansard_data=None):
     """
     Hansard dates may take multiple pages
     Attempt the pages from 1 to infinity, exit on http not found error
     """
-    hansard_data = []
+    if not hansard_data:
+        hansard_data = []
     
     page = 1
     xml_data = True
@@ -130,14 +132,25 @@ def parse_hansard_xml(xml_data, hansard_data, source_url, date):
                     'context'    : ' '.join([major_heading, minor_heading, details]),
                     'timestamp'  : date.strftime('%Y-%m-%d')+' '+tag.get('time'),
                 }
-            )    
+            )
     
 # Main -------------------------------------------------------------------------
 
-hansard_data = get_hansard_data(args.report_type, args.date_import)
 
-if args.output:
-    file = open(args.output, 'w')
+
+if args.date_range:
+    args.date_range = [parse_date(date) for date in args.date_range]
+    day = datetime.timedelta(day=1)
+    date = args.date_range[0]
+    hansard_data = []
+    while date < args.date_range[1]:
+        get_hansard_data(args.report_type, date, hansard_data=hansard_data)
+    
+elif args.date:
+    hansard_data = get_hansard_data(args.report_type, args.date)
+
+if args.file_out:
+    file = open(args.file_out, 'w')
     file.write(json.dumps(hansard_data))
     file.close()
 elif args.db_out:
