@@ -10,5 +10,5 @@ word(id, stemmed_name, canonical_name)
 # redundant with automatic stemming?
 # word_alias(id, name)
 
-person_word(person_id, word_id, uses)
+person_word(person_id, related_word_id, uses)
 word_word(word_id, related_word_id, uses)
