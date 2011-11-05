@@ -101,8 +101,8 @@ def main():
     conn_string = "host='localhost' dbname='%(user)s' user='%(user)s' password='%(user)s'" % {'user': os.environ['USER']}
     conn = psycopg2.connect(conn_string)
 
-    #create_processed_tables(conn)
-    #process(conn)
+    create_processed_tables(conn)
+    process(conn)
     print_results(conn)
 
     conn.commit()
