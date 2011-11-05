@@ -8,10 +8,10 @@ def create_input(conn):
     print "*** Inventing input"
     cursor = conn.cursor()
     cursor.execute("DROP TABLE IF EXISTS input")
-    cursor.execute("CREATE TABLE input(time_said time with time zone default current_time, name text, body text, source text)")
+    cursor.execute("CREATE TABLE input(time_said time with time zone default current_time, person_name text, speech_text text, source_url text)")
     for line in file("plain-text-input.txt"):
         person, text = line.strip().split(" ", 1)
-        cursor.execute("INSERT INTO input(name, body) VALUES (%s, %s)", (person, text))
+        cursor.execute("INSERT INTO input(person_name, speech_text) VALUES (%s, %s)", (person, text))
 
 
 def create_processed_tables(conn):
@@ -87,7 +87,7 @@ def add_person_word(conn, person_id, word_id):
 def process(conn):
     print "*** Processing"
     cursor = conn.cursor()
-    cursor.execute("SELECT time_said, name, body FROM input")
+    cursor.execute("SELECT time_said, person_name, speech_text FROM input")
     for time, name, body in cursor:
         person_id = get_person_id(conn, name)
         for word in body.split():

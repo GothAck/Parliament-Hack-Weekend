@@ -1,5 +1,5 @@
 
-input(date_said, name, body)
+input(date_said, person_name, speech_text, source_url)
 
 
 
