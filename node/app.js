@@ -18,21 +18,14 @@ var dbParams = {
 
 FastLegS.connect(dbParams);
 
-var PersonWord, Person, Word;
+// FastLegS Table definitions
 
-PersonWord = FastLegS.Base.extend({
+var PersonWord = FastLegS.Base.extend({
   tableName: 'person_word',
   primaryKey: ['person_id', 'related_word_id'],
-//  belongsTo: [
-//    {'word': Word, joinOn: 'word.related_word_id'}
-//  ],
-
-//  belongsTo: [
-//    {'person': 'person', joinOn: 'person_id'}
-//  ]
 });
 
-Person = FastLegS.Base.extend({
+var Person = FastLegS.Base.extend({
   tableName: 'person',
   primaryKey: 'id',
   many: [
@@ -43,7 +36,7 @@ Person = FastLegS.Base.extend({
   }
 });
 
-Word = FastLegS.Base.extend({
+var Word = FastLegS.Base.extend({
   tableName: 'word',
   primaryKey: 'id',
   many: [
@@ -55,6 +48,8 @@ PersonWord.one = [
   {'person': Person, joinOn: 'person_id'},
   {'word': Word, joinOn: 'related_word_id'}
 ]
+
+// Express app creation
 
 var app = module.exports = express.createServer();
 
@@ -91,45 +86,51 @@ app.get('/', function(req, res){
   });
 });
 
-app.get('/person/search/:person_name', function(req, res){
+app.get('/person/search/:person_name.:format?', function(req, res){
   res.render('people', {
-    people: req.People,
+    people: req.obs.People,
   });
 });
 
-app.get('/person/:person_id', function(req, res){
+app.get('/person/:person_id.:format?', function(req, res){
   res.render('person', {
-    person: req.Person,
+    person: req.obs.Person,
   });
 });
 
-app.get('/person', function(req, res, next){
-  if (req.query.person_id)
-    res.redirect('/person/'+req.query.person_id);
-  if (req.query.person_name)
-    res.redirect('/person/search/'+req.query.person_name);
+app.get('/person.:formatr?', function(req, res, next){
+  var format = (req.params.formatr)?'.'+req.params.formatr:'';
+  if (req.query.person_id) {
+    res.redirect('/person/'+req.query.person_id+format);
+  }
+  if (req.query.person_name) {
+    res.redirect('/person/search/'+req.query.person_name+format);
+  }
   next();
 });
 
-app.get('/word/search/:word_string', function(req, res){
+app.get('/word/search/:word_string.:format?', function(req, res){
   res.render('words', {
-    words: req.Words,
+    words: req.obs.Words,
   });
 });
 
-app.get('/word/:word_id', function(req, res){
+app.get('/word/:word_id.:format?', function(req, res){
   res.render('word', {
-    word: req.Word,
+    word: req.obs.Word,
   });
 });
 
-app.get('/word', function(req, res, next){
+app.get('/word.:formatr?', function(req, res, next){
+  var format = (req.params.formatr)?'.'+req.params.formatr:'';
   if (req.query.word_id)
-    res.redirect('/word/'+req.query.word_id);
+    res.redirect('/word/'+req.query.word_id+format);
   if (req.query.word_string)
-    res.redirect('/word/search/'+req.query.word_string);
+    res.redirect('/word/search/'+req.query.word_string+format);
   next();
 });
+
+// Parameter pre-processing
 
 app.param('person_id', function(req, res, next, id){
 
@@ -141,7 +142,8 @@ app.param('person_id', function(req, res, next, id){
     function (err, result) {
       if (err)
         throw new Error();
-      req.Person = result;
+      if (!req.obs) req.obs = {};
+      req.obs.Person = result;
       console.log(JSON.stringify(result));
       next();
     }
@@ -153,7 +155,8 @@ app.param('person_name', function(req, res, next, id){
   Person.find({'canonical_name.ilike': '%'+id+'%'}, function (err, result) {
     if (err)
       throw new Error();
-    req.People = result;
+    if (!req.obs) req.obs = {};
+    req.obs.People = result;
     console.log(JSON.stringify(result));
     next();
   });
@@ -166,7 +169,8 @@ app.param('word_id', function(req, res, next, id){
     function (err, result) {
       if (err)
         throw new Error();
-      req.Word = result;
+      if (!req.obs) req.obs = {};
+      req.obs.Word = result;
       next();
     }
   );
@@ -176,9 +180,19 @@ app.param('word_string', function(req, res, next, id){
   Word.find({'canonical_name.ilike': '%'+id+'%'}, function (err, result) {
     if (err)
       next(err);
-    req.Words = result;
+    if (!req.obs) req.obs = {};
+    req.obs.Words = result;
     next();
   });
+});
+
+app.param('format', function(req, res, next, id){
+console.log(id);
+  if (!id) next();
+  if (id == 'json') {
+    res.write(JSON.stringify(req.obs));
+    res.end();
+  }
 });
 
 app.listen(3001);
