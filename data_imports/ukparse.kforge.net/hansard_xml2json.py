@@ -2,6 +2,7 @@ import argparse
 import urllib2
 import datetime
 import os
+import psycopg2
 from dateutil.parser import parse as parse_date
 
 from BeautifulSoup import BeautifulSoup
@@ -11,6 +12,7 @@ import json
 parser = argparse.ArgumentParser(description='Import text data from UK parliment hansard.')
 parser.add_argument('--date'  , dest='date_import', type=parse_date, default=datetime.datetime.now(), help='date to import from hansard website')
 parser.add_argument('--output', dest='file_out'                                                     , help='the outputfile to write to')
+parser.add_argument('--db',     dest='db_out'                                                       , help='the outputfile to write to')
 args = parser.parse_args()
 
 
@@ -123,6 +125,41 @@ if args.file_out:
     file = open(args.file_out, 'w')
     file.write(json.dumps(hansard_data))
     file.close()
+elif args.db_out:
+    conn_string = "host='localhost' dbname='%(user)s' user='%(user)s' password='%(user)s'" % {'user': os.environ['USER']}
+    conn = psycopg2.connect(conn_string)
+    cursor = conn.cursor()
+    cursor.execute("DROP TABLE IF EXISTS input CASCADE")
+    cursor.execute("CREATE TABLE input(speakerid integer, speakername text, url text, text text, context text, timestamp text)")
+
+    def to_id(n):
+        if n.isdigit():
+            return int(n)
+        return -1
+
+    for count, line in enumerate(hansard_data):
+        print "processed %d lines" % count
+        cursor.execute(
+            """
+                INSERT INTO input(
+                    timestamp,
+                    speakerid,
+                    speakername,
+                    text,
+                    context,
+                    url
+                )
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                line["timestamp"],
+                to_id(line['speakerid'].split("/")[-1]),
+                line['speakername'],
+                line["text"],
+                line["context"],
+                line["url"],
+            )
+        )
+    conn.commit()
 else:
     import pprint
     pprint.pprint(hansard_data)
