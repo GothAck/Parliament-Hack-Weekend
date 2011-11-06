@@ -34,64 +34,46 @@ def create_processed_tables(conn):
     cursor.execute("CREATE TABLE word_word(word_id integer references word(id), related_word_id integer references word(id), uses integer not null default 0)")
 
 
-word_id_cache = {}
-
-def get_word_id(conn, name):
-    if name in word_id_cache:
-        return word_id_cache[name]
-    stemmed_name = stem(name)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id FROM word WHERE ts_lexize('english_stem', name) = ts_lexize('english_stem', %s)", (stemmed_name, ))
-    row = cursor.fetchone()
-    if row:
-        word_id = row[0]
-    else:
-        cursor.execute("INSERT INTO word(name) VALUES (%s) RETURNING id" , (name, ))
-        word_id = cursor.fetchone()[0]
-    word_id_cache[name] = word_id
-    return word_id
-
-
-person_words = {}
-
-def add_person_word(conn, person_id, word_id):
-    if person_id not in person_words:
-        person_words[person_id] = {}
-    if word_id not in person_words[person_id]:
-        person_words[person_id][word_id] = 0
-    person_words[person_id][word_id] = person_words[person_id][word_id] + 1
-    #cursor = conn.cursor()
-    #cursor.execute("SELECT uses FROM person_word WHERE person_id=%s AND related_word_id=%s", (person_id, word_id))
-    #row = cursor.fetchone()
-    #if row:
-    #    cursor.execute("UPDATE person_word SET uses = uses + 1 WHERE person_id=%s AND related_word_id=%s", (person_id, word_id))
-    #else:
-    #    cursor.execute("INSERT INTO person_word (person_id, related_word_id, uses) VALUES (%s, %s, 1)", (person_id, word_id))
-
-
-def commit_words(conn):
-    cursor = conn.cursor()
-    for person_id in person_words:
-        print "Committing words for person %d" % person_id
-        for word_id in person_words[person_id]:
-            cursor.execute("INSERT INTO person_word (person_id, related_word_id, uses) VALUES (%s, %s, %s)", (person_id, word_id, person_words[person_id][word_id]))
-
 def process(conn):
     print "*** Processing"
     cursor = conn.cursor()
     cursor.execute("DELETE FROM person")
     cursor.execute("INSERT INTO person(id, name) (SELECT DISTINCT speakerid, max(speakername) FROM input GROUP BY speakerid)")
 
-    cursor.execute("SELECT timestamp, speakerid, speakername, text FROM input")
-    for counter, (time, person_id, name, body) in enumerate(cursor):
+    word_list = []
+    person_words = {}
+
+    cursor.execute("SELECT speakerid, text FROM input")
+    for counter, (person_id, body) in enumerate(cursor):
         print "processed %d events" % counter
         for word in body.split():
             if word not in stop_words:
-                word_id = get_word_id(conn, word)
-                add_person_word(conn, person_id, word_id)
+
+                word = word.lower()
+                for letter in "!?.,":
+                    word = word.replace(letter, "")
+
+                if word not in word_list:
+                    word_list.append(word)
+
+                word_id = word_list.index(word)
+
+                if person_id not in person_words:
+                    person_words[person_id] = {}
+                if word_id not in person_words[person_id]:
+                    person_words[person_id][word_id] = 0
+                person_words[person_id][word_id] = person_words[person_id][word_id] + 1
+
         # TODO: relate words to other words
         #print "%s %20s %s" % (time, name, body[:40])
-    commit_words(conn)
+    cursor = conn.cursor()
+    for n, word in enumerate(word_list):
+        cursor.execute("INSERT INTO word (id, name) VALUES (%s, %s)", (n, word))
+
+    for person_id in person_words:
+        print "Committing words for person %d" % person_id
+        for word_id in person_words[person_id]:
+            cursor.execute("INSERT INTO person_word (person_id, related_word_id, uses) VALUES (%s, %s, %s)", (person_id, word_id, person_words[person_id][word_id]))
 
 
 def print_results(conn):

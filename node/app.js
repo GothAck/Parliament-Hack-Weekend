@@ -94,8 +94,16 @@ app.get('/person/search/:person_name.:format?', function(req, res){
 });
 
 app.get('/person/:person_id.:format?', function(req, res){
+  var min = 9001;
+  var max = 0;
+  req.obs.Person.words.forEach(function(f) {
+  	min = Math.min(min, f.uses);
+  	max = Math.max(max, f.uses);
+  });
   res.render('person', {
     person: req.obs.Person,
+	min_uses: min,
+	max_uses: max,
   });
 });
 
@@ -141,8 +149,9 @@ app.get('/word.:formatr?', function(req, res, next){
 app.param('person_id', function(req, res, next, id){
   Person.find(
     id,
-    { include: { words: { limit: req.query.limit || 10, offset: req.query.offset || 0, order: ['-uses'], include: { word: {} } } } },
+    { include: { words: { limit: req.query.limit || 50, offset: req.query.offset || 0, order: ['-uses'], include: { word: {} } } } },
     function (err, result) {
+	  result.words.sort(function(a, b) {return a.word.name.toLowerCase() > b.word.name.toLowerCase();});
       if (err)
         throw new Error();
       if (!req.obs) req.obs = {};
@@ -157,7 +166,7 @@ app.param('person_name', function(req, res, next, id){
   console.log('searching for person_name', id);
   if (id) id = '%' + id + '%';
   if (!id) id = '%';
-  Person.find({'name.ilike': id}, { limit: req.query.limit || 10, offset: req.query.offset || 0 }, function (err, result) {
+  Person.find({'name.ilike': id}, { limit: req.query.limit || 20, offset: req.query.offset || 0 }, function (err, result) {
     if (err)
       throw new Error();
     if (!req.obs) req.obs = {};
@@ -170,7 +179,7 @@ app.param('person_name', function(req, res, next, id){
 app.param('word_id', function(req, res, next, id){
   Word.find(
     id,
-    { include: { people: { limit: req.query.limit || 10, offset: req.query.offset || 0, order: ['-uses'], include: { person: {} } } } },
+    { include: { people: { limit: req.query.limit || 20, offset: req.query.offset || 0, order: ['-uses'], include: { person: {} } } } },
     function (err, result) {
       if (err)
         throw new Error();
@@ -184,7 +193,7 @@ app.param('word_id', function(req, res, next, id){
 app.param('word_string', function(req, res, next, id){
   if (id) id = '%' + id + '%';
   if (!id) id = '%';
-  Word.find({'name.ilike': '%'+id+'%'}, { limit: req.query.limit || 10, offset: req.query.offset || 0 }, function (err, result) {
+  Word.find({'name.ilike': '%'+id+'%'}, { limit: req.query.limit || 20, offset: req.query.offset || 0 }, function (err, result) {
     if (err)
       next(err);
     if (!req.obs) req.obs = {};
