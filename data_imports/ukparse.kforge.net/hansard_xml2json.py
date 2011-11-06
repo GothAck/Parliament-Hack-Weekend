@@ -23,6 +23,7 @@ parser.add_argument('-o' , '--output'     , dest='file_out'                     
 parser.add_argument('-r' , '--report_type', dest='report_type', choices=report_types      , default='debates'              , help='report type to query from %s' % report_types)
 parser.add_argument('-s ', '--source'     , dest='source'     , choices=sources           , default='local_only'           , help='source of data from %s' % sources)
 parser.add_argument('-db', '--db'         , dest='db_out'                                                                  , help='output to db')
+parser.add_argument(       '--clean'      , dest='clean'                                                                   , help='wipe / create blank DB first')
 args = parser.parse_args()
 
 
@@ -159,8 +160,10 @@ elif args.db_out:
     conn_string = "host='localhost' dbname='%(user)s' user='%(user)s' password='%(user)s'" % {'user': os.environ['USER']}
     conn = psycopg2.connect(conn_string)
     cursor = conn.cursor()
-    cursor.execute("DROP TABLE IF EXISTS input CASCADE")
-    cursor.execute("CREATE TABLE input(speakerid integer, speakername text, url text, text text, context text, timestamp text)")
+
+    if args.clean:
+        cursor.execute("DROP TABLE IF EXISTS input CASCADE")
+        cursor.execute("CREATE TABLE input(speakerid integer, speakername text, url text, text text, context text, timestamp text)")
 
     def to_id(n):
         if n.isdigit():
