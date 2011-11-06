@@ -7,6 +7,8 @@ import json
 import re
 from Stemmer import Stemmer
 
+from dateutil.parser import parse as parse_date
+
 stemmer = Stemmer('english')
 stop_words = [w.strip() for w in file("stop-words.txt").readlines()]
 
@@ -29,13 +31,13 @@ def create_processed_tables(conn):
     cursor.execute("CREATE INDEX stemmed_word on word(ts_lexize('english_stem', name))")
 
     cursor.execute("DROP TABLE IF EXISTS person_word CASCADE")
-    cursor.execute("CREATE TABLE person_word(person_id integer references person(id), related_word_id integer references word(id), uses integer not null default 0)")
+    cursor.execute("CREATE TABLE person_word(person_id integer references person(id), date date, related_word_id integer references word(id), uses integer not null default 0)")
 
     cursor.execute("DROP TABLE IF EXISTS word_word CASCADE")
     cursor.execute("CREATE TABLE word_word(word_id integer references word(id), related_word_id integer references word(id), uses integer not null default 0)")
 
     cursor.execute("DROP TABLE IF EXISTS word_word_distance CASCADE")
-    cursor.execute("CREATE TABLE word_word_distance(word_id integer references word(id), related_word_id integer references word(id), dist integer not null default 0, uses integer not null default 0)")
+    cursor.execute("CREATE TABLE word_word_distance(person_id integer references person(id), date date, word_id integer references word(id), related_word_id integer references word(id), dist integer not null default 0, uses integer not null default 0)")
 
 word_id_cache = {}
 
@@ -92,6 +94,10 @@ def process(conn):
     swpa = {}
     for counter, (time, person_id, name, body) in enumerate(cursor):
         print "processed %d events" % counter
+        try:
+            dtime = parse_date(time)
+        except:
+            dtime = parse_date('%s 00:00:00' % time.split(' ',2)[0])
         for word in body.split():
             word = word.lower()
             if word not in stop_words:
@@ -109,13 +115,14 @@ def process(conn):
                 if word in stop_words or i == 0 or len(word)==0:
                     continue
                 word_id = get_word_id(conn, word)
-                for ia in range(i-1):
+                lr = i-6 if i-6 >= 0 else 0
+                for ia in range(lr, i-1):
                     word2 = words[ia].lower()
                     if word2 in stop_words or len (word2)==0:
                         continue
                     word_id2 = get_word_id(conn, word2)
                     word_id, word_id2 = sorted([word_id, word_id2])
-                    key = (word_id, word_id2, i-ia)
+                    key = (person_id, dtime.date(), word_id, word_id2, i-ia)
                     swpa[key] = swpa.get(key, 0) + 1
     commit_words(conn)
     dist_len = len(swpa)
@@ -123,8 +130,8 @@ def process(conn):
     for k,v in swpa.iteritems():
         print 'Commtted word_distance %s / %s' % (i, dist_len)
         i += 1
-        w1, w2, d = k
-        cursor.execute("INSERT INTO word_word_distance (word_id, related_word_id, dist, uses) VALUES (%s, %s, %s, %s)", (w1, w2, d, v))
+        pid, dt, w1, w2, d = k
+        cursor.execute("INSERT INTO word_word_distance (person_id, date, word_id, related_word_id, dist, uses) VALUES (%s, %s, %s, %s, %s, %s)", (pid, dt.isoformat(), w1, w2, d, v))
 
 
 def print_results(conn):
