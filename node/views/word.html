@@ -1,9 +1,9 @@
-<h1>${word.canonical_name}</h1>
-${word.canonical_name}
+<h1>${word.name}</h1>
+${word.name}
 
 <h2>Used by</h2>
 <ul>
 {{each word.people}}
-  <li><a href="/person/${$value.person.id}">${$value.person.canonical_name} <b>${$value.uses} times</b></a></li>
+  <li><a href="/person/${$value.person.id}">${$value.person.name} <b>${$value.uses} times</b></a></li>
 {{/each}}
 </ul>
