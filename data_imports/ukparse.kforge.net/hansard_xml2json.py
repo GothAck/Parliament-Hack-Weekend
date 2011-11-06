@@ -8,6 +8,9 @@ import datetime
 import psycopg2
 from dateutil.parser import parse as parse_date
 from BeautifulSoup import BeautifulSoup
+from HTMLParser import HTMLParser
+
+
 
 
 # Constants --------------------------------------------------------------------
@@ -123,16 +126,16 @@ def parse_hansard_xml(xml_data, hansard_data, source_url, date):
             minor_heading = tag.text
             
         if tag.get('nospeaker'):
-            details += tag.text
+            details += ' %s' % tag.text
             
-        if tag.get('speakerid'):            
+        if tag.get('speakerid'):
             hansard_data.append(
                 {
                     'speakerid'  : tag.get('speakerid'  ),
                     'speakername': tag.get('speakername'),
                     'url'        : tag.get('url')        ,
-                    'text'       : tag.text              ,
-                    'context'    : ' '.join([major_heading, minor_heading, details]),
+                    'text'       : HTMLParser.unescape.__func__(HTMLParser, tag.text),
+                    'context'    : HTMLParser.unescape.__func__(HTMLParser, ' '.join([major_heading, minor_heading, details]) ),
                     'timestamp'  : date.strftime('%Y-%m-%d')+' '+tag.get('time'),
                 }
             )
@@ -146,9 +149,9 @@ if args.date_range:
     day = datetime.timedelta(days=1)
     date = args.date_range[0]
     hansard_data = []
-    while date < args.date_range[1]:
-        print "%s - %d total data entries" % (date, len(hansard_data))
+    while date <= args.date_range[1]:
         get_hansard_data(args.report_type, date, hansard_data=hansard_data)
+        print "%s - %d total data entries" % (date, len(hansard_data))
         date += day
     
 elif args.date:
