@@ -100,11 +100,13 @@ app.get('/person/:person_id.:format?', function(req, res){
 
 app.get('/person.:formatr?', function(req, res, next){
   var format = (req.params.formatr)?'.'+req.params.formatr:'';
-  if (req.query.person_id) {
+  if ('person_id' in req.query) {
     res.redirect('/person/'+req.query.person_id+format);
-  }
-  if (req.query.person_name) {
+  } else if ('person_name' in req.query) {
     res.redirect('/person/search/'+req.query.person_name+format);
+  } else {
+    
+    // Base return
   }
   next();
 });
@@ -123,22 +125,22 @@ app.get('/word/:word_id.:format?', function(req, res){
 
 app.get('/word.:formatr?', function(req, res, next){
   var format = (req.params.formatr)?'.'+req.params.formatr:'';
-  if (req.query.word_id)
+  if ('word_id' in req.query) {
     res.redirect('/word/'+req.query.word_id+format);
-  if (req.query.word_string)
+  } else if ('word_string' in req.query) {
     res.redirect('/word/search/'+req.query.word_string+format);
+  } else {
+    // Base return
+  }
   next();
 });
 
 // Parameter pre-processing
 
 app.param('person_id', function(req, res, next, id){
-
-//.find(1, {include:{people:{include:{word:{}}}}}, function (e,r) {console.log(r)});
-
   Person.find(
     id,
-    { include: { words: { include: { word: {} } } } },
+    { include: { words: { limit: req.query.limit || 10, offset: req.query.offset || 0, order: ['-uses'], include: { word: {} } } } },
     function (err, result) {
       if (err)
         throw new Error();
@@ -152,7 +154,9 @@ app.param('person_id', function(req, res, next, id){
 
 app.param('person_name', function(req, res, next, id){
   console.log('searching for person_name', id);
-  Person.find({'canonical_name.ilike': '%'+id+'%'}, function (err, result) {
+  if (id) id = '%' + id + '%';
+  if (!id) id = '%';
+  Person.find({'name.ilike': id}, { limit: req.query.limit || 10, offset: req.query.offset || 0 }, function (err, result) {
     if (err)
       throw new Error();
     if (!req.obs) req.obs = {};
@@ -165,7 +169,7 @@ app.param('person_name', function(req, res, next, id){
 app.param('word_id', function(req, res, next, id){
   Word.find(
     id,
-    { include: { people: { include: { person: {} } } } },
+    { include: { people: { limit: req.query.limit || 10, offset: req.query.offset || 0, order: ['-uses'], include: { person: {} } } } },
     function (err, result) {
       if (err)
         throw new Error();
@@ -177,7 +181,9 @@ app.param('word_id', function(req, res, next, id){
 });
 
 app.param('word_string', function(req, res, next, id){
-  Word.find({'canonical_name.ilike': '%'+id+'%'}, function (err, result) {
+  if (id) id = '%' + id + '%';
+  if (!id) id = '%';
+  Word.find({'name.ilike': '%'+id+'%'}, { limit: req.query.limit || 10, offset: req.query.offset || 0 }, function (err, result) {
     if (err)
       next(err);
     if (!req.obs) req.obs = {};
