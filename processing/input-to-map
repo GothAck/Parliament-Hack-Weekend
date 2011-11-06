@@ -25,10 +25,12 @@ def create_processed_tables(conn):
 
     cursor.execute("DROP TABLE IF EXISTS word CASCADE")
     cursor.execute("CREATE TABLE word(id serial primary key, name text not null)")
-    cursor.execute("CREATE INDEX stemmed_word on word(ts_lexize('english_stem', name))")
+    #cursor.execute("CREATE INDEX stemmed_word on word(ts_lexize('english_stem', name))")
 
     cursor.execute("DROP TABLE IF EXISTS person_word CASCADE")
     cursor.execute("CREATE TABLE person_word(person_id integer references person(id), related_word_id integer references word(id), uses integer not null default 0)")
+    cursor.execute("CREATE INDEX person_word__person ON person_word(person_id)")
+    cursor.execute("CREATE INDEX person_word__word ON person_word(related_word_id)")
 
     cursor.execute("DROP TABLE IF EXISTS word_word CASCADE")
     cursor.execute("CREATE TABLE word_word(word_id integer references word(id), related_word_id integer references word(id), uses integer not null default 0)")
