@@ -151,10 +151,10 @@ app.param('person_id', function(req, res, next, id){
     id,
     { include: { words: { limit: req.query.limit || 50, offset: req.query.offset || 0, order: ['-uses'], include: { word: {} } } } },
     function (err, result) {
-	  result.words.sort(function(a, b) {return a.word.name.toLowerCase() > b.word.name.toLowerCase();});
       if (err)
         throw new Error();
       if (!req.obs) req.obs = {};
+	  result.words.sort(function(a, b) {return a.word.name > b.word.name ? 1 : -1;});
       req.obs.Person = result;
       console.log(JSON.stringify(result));
       next();
