@@ -1,7 +1,7 @@
 <h1>Where has ${name} talked about ${word}?</h1>
 
 <ul>
-{{each reference}}
-  <a href="${$value.url}">${$value.timestamp} -- ${$value.text}</a>
+{{each references}}
+  <li>${$value.timestamp} <a href="${$value.url}">{{html $value.ts_headline}}</a>
 {{/each}}
 </ul>

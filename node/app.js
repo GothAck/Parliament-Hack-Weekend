@@ -21,6 +21,10 @@ FastLegS.connect(dbParams);
 
 // FastLegS Table definitions
 
+var Input = FastLegS.Base.extend({
+  tableName: 'input',
+});
+
 var PersonWord = FastLegS.Base.extend({
   tableName: 'person_word_proportional',
   primaryKey: ['person_id', 'related_word_id'],
@@ -152,17 +156,33 @@ app.get('/word.:formatr?', function(req, res, next){
   next();
 });
 
-app.get('/references/:person_id/:word.:format?', function(req, res){
-  res.render('references', {
-  	name: req.obs.Person.name,
-	word: req.params.word,
-	// SELECT url, ts_headline(text, %s::tsquery), timestamp FROM input WHERE speakerid=%s AND to_tsvector(text) @@ %s::tsquery
-	references: [{url: "blag", timestamp: "bloh", text: "wibble wobble"}],
-  });
+app.get('/references/:person_id/:reference_word.:format?', function(req, res){
+    res.render('references', {
+      name: req.obs.Person.name,
+      word: req.params.reference_word,
+      references: req.obs.references,
+    });
 });
 
 
 // Parameter pre-processing
+
+app.param('reference_word', function(req, res, next, id){
+  var query = "SELECT url, ts_headline(text, $1::tsquery), timestamp FROM input WHERE speakerid=$2 AND to_tsvector(text) @@ $1::tsquery";
+  query = FastLegS.client.client.query(query, [id, req.obs.Person.id]);
+
+  var results = [];
+  query.on('error', function(err) {
+  	console.log(err);
+  });
+  query.on('row', function(row) {
+  	results.push(row);
+  });
+  query.on('end', function() {
+    req.obs.references = results;
+	next();
+  });
+});
 
 app.param('person_id', function(req, res, next, id){
   Person.find(
