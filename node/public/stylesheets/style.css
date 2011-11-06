@@ -23,6 +23,10 @@ a {
   -webkit-box-shadow: 0 0 0.5em #333333;
   box-shadow: 0 0 0.5em #333333;
   background-color: white; }
+  .wrapper #word_list {
+    width: 100%;
+    height: 500px;
+    position: relative; }
 
 .footer {
   text-align: center;

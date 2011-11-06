@@ -1,0 +1,5 @@
+brownish: #94835d
+less brown: #e0cea4
+beige: #fff2d4
+dark blue: #4e6494
+blue: #a4b7e0

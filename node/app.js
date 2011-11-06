@@ -127,8 +127,16 @@ app.get('/word/search/:word_string.:format?', function(req, res){
 });
 
 app.get('/word/:word_id.:format?', function(req, res){
+  var min = 9001;
+  var max = 0;
+  req.obs.Word.people.forEach(function(f) {
+  	min = Math.min(min, f.uses);
+  	max = Math.max(max, f.uses);
+  });
   res.render('word', {
     word: req.obs.Word,
+	min_uses: min,
+	max_uses: max,
   });
 });
 
@@ -150,11 +158,11 @@ app.param('person_id', function(req, res, next, id){
   Person.find(
     id,
     { include: { words: { limit: req.query.limit || 50, offset: req.query.offset || 0, order: ['-uses'], include: { word: {} } } } },
-    function (err, result) {
-	  result.words.sort(function(a, b) {return a.word.name.toLowerCase() > b.word.name.toLowerCase();});
+	function (err, result) {
       if (err)
         throw new Error();
       if (!req.obs) req.obs = {};
+	  result.words.sort(function(a, b) {return a.word.name > b.word.name ? 1 : -1;});
       req.obs.Person = result;
       console.log(JSON.stringify(result));
       next();
@@ -184,6 +192,7 @@ app.param('word_id', function(req, res, next, id){
       if (err)
         throw new Error();
       if (!req.obs) req.obs = {};
+	  result.people.sort(function(a, b) {return a.person.name > b.person.name ? 1 : -1;});
       req.obs.Word = result;
       next();
     }
