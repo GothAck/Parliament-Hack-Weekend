@@ -21,7 +21,7 @@ def create_processed_tables(conn):
     cursor = conn.cursor()
 
     cursor.execute("DROP TABLE IF EXISTS person CASCADE")
-    cursor.execute("CREATE TABLE person(id serial primary key, name text not null)")
+    cursor.execute("CREATE TABLE person(id serial primary key, name text not null, word_sum integer default 0)")
 
     cursor.execute("DROP TABLE IF EXISTS word CASCADE")
     cursor.execute("CREATE TABLE word(id serial primary key, name text not null)")
@@ -87,6 +87,8 @@ def create_indexes(conn):
     #cursor.execute("CREATE INDEX stemmed_word on word(ts_lexize('english_stem', name))")
     cursor.execute("CREATE INDEX person_word__person ON person_word(person_id)")
     cursor.execute("CREATE INDEX person_word__word ON person_word(related_word_id)")
+    cursor.execute("UPDATE person SET word_sum = (SELECT SUM(uses) FROM person_word WHERE person_id=person.id)")
+    cursor.execute("CREATE VIEW person_word_proportional AS select *,uses::decimal/(select word_sum from person where person.id=person_id) AS uses_proportion FROM person_word")
 
 
 def print_results(conn):
@@ -114,9 +116,11 @@ def main():
     create_processed_tables(conn)
     process(conn)
     create_indexes(conn)
-    print_results(conn)
 
     conn.commit()
+
+    print_results(conn)
+
 
 if __name__ == "__main__":
     main()
