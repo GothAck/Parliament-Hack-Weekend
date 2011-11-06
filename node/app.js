@@ -26,6 +26,11 @@ var PersonWord = FastLegS.Base.extend({
   primaryKey: ['person_id', 'related_word_id'],
 });
 
+var WordDistance = FastLegS.Base.extend({
+  tableName: 'word_word_distance',
+  primaryKey: ['word_id', 'related_word_id'],
+});
+
 var Person = FastLegS.Base.extend({
   tableName: 'person',
   primaryKey: 'id',
@@ -143,8 +148,7 @@ app.param('person_id', function(req, res, next, id){
     id,
     { include: { words: { limit: req.query.limit || 10, offset: req.query.offset || 0, order: ['-uses'], include: { word: {} } } } },
     function (err, result) {
-      if (err)
-        throw new Error();
+      if (err) return next(err);
       if (!req.obs) req.obs = {};
       req.obs.Person = result;
       console.log(JSON.stringify(result));
@@ -158,8 +162,7 @@ app.param('person_name', function(req, res, next, id){
   if (id) id = '%' + id + '%';
   if (!id) id = '%';
   Person.find({'name.ilike': id}, { limit: req.query.limit || 10, offset: req.query.offset || 0 }, function (err, result) {
-    if (err)
-      throw new Error();
+    if (err) return next(err);
     if (!req.obs) req.obs = {};
     req.obs.People = result;
     console.log(JSON.stringify(result));
@@ -172,11 +175,18 @@ app.param('word_id', function(req, res, next, id){
     id,
     { include: { people: { limit: req.query.limit || 10, offset: req.query.offset || 0, order: ['-uses'], include: { person: {} } } } },
     function (err, result) {
-      if (err)
-        throw new Error();
+      if (err) return next(err);
       if (!req.obs) req.obs = {};
       req.obs.Word = result;
-      next();
+      WordDistance.find(
+        {word_id: id},
+        { limit: 10 },
+        function (err, result) {
+          if (err) return next(err);
+          req.obs.WordDistance1 = result
+          next();
+        }
+      );
     }
   );
 });

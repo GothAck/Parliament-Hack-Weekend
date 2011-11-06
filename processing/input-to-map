@@ -4,6 +4,7 @@ import psycopg2
 import psycopg2.extras
 import os
 import json
+import re
 from Stemmer import Stemmer
 
 stemmer = Stemmer('english')
@@ -33,6 +34,8 @@ def create_processed_tables(conn):
     cursor.execute("DROP TABLE IF EXISTS word_word CASCADE")
     cursor.execute("CREATE TABLE word_word(word_id integer references word(id), related_word_id integer references word(id), uses integer not null default 0)")
 
+    cursor.execute("DROP TABLE IF EXISTS word_word_distance CASCADE")
+    cursor.execute("CREATE TABLE word_word_distance(word_id integer references word(id), related_word_id integer references word(id), dist integer not null default 0, uses integer not null default 0)")
 
 word_id_cache = {}
 
@@ -76,6 +79,9 @@ def commit_words(conn):
         for word_id in person_words[person_id]:
             cursor.execute("INSERT INTO person_word (person_id, related_word_id, uses) VALUES (%s, %s, %s)", (person_id, word_id, person_words[person_id][word_id]))
 
+word_distances = {}
+
+
 def process(conn):
     print "*** Processing"
     cursor = conn.cursor()
@@ -83,15 +89,42 @@ def process(conn):
     cursor.execute("INSERT INTO person(id, name) (SELECT DISTINCT speakerid, max(speakername) FROM input GROUP BY speakerid)")
 
     cursor.execute("SELECT timestamp, speakerid, speakername, text FROM input")
+    swpa = {}
     for counter, (time, person_id, name, body) in enumerate(cursor):
         print "processed %d events" % counter
         for word in body.split():
+            word = word.lower()
             if word not in stop_words:
                 word_id = get_word_id(conn, word)
                 add_person_word(conn, person_id, word_id)
         # TODO: relate words to other words
         #print "%s %20s %s" % (time, name, body[:40])
+        sentences = body.split('.')
+        for sentence in sentences:
+            sentence_word_positions={}
+            words = re.split('[^\w]', sentence)
+            count = 0
+            for i, word in enumerate(words):
+                word = word.lower()
+                if word in stop_words or i == 0 or len(word)==0:
+                    continue
+                word_id = get_word_id(conn, word)
+                for ia in range(i-1):
+                    word2 = words[ia].lower()
+                    if word2 in stop_words or len (word2)==0:
+                        continue
+                    word_id2 = get_word_id(conn, word2)
+                    word_id, word_id2 = sorted([word_id, word_id2])
+                    key = (word_id, word_id2, i-ia)
+                    swpa[key] = swpa.get(key, 0) + 1
     commit_words(conn)
+    dist_len = len(swpa)
+    i = 0
+    for k,v in swpa.iteritems():
+        print 'Commtted word_distance %s / %s' % (i, dist_len)
+        i += 1
+        w1, w2, d = k
+        cursor.execute("INSERT INTO word_word_distance (word_id, related_word_id, dist, uses) VALUES (%s, %s, %s, %s)", (w1, w2, d, v))
 
 
 def print_results(conn):
