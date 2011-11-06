@@ -9,3 +9,13 @@
   href="/person/${$value.person.id}">${$value.person.name}<!-- <b>${$value.uses} times</b>--></a>
 {{/each}}
 </div>
+<div>
+  <h2>Possibly related words</h2>
+  <ul>
+{{each distance}}
+    <li>
+      <a href="/word/${$value.id}">${$value.word}</a>
+    </li>
+{{/each}}
+  </ul>
+</div>

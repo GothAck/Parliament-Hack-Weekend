@@ -144,6 +144,7 @@ app.get('/word/:word_id.:format?', function(req, res){
   });
   res.render('word', {
     word: req.obs.Word,
+    distance: req.obs.WordDistance,
 	min_uses: min,
 	max_uses: max,
   });
@@ -238,7 +239,9 @@ app.param('word_id', function(req, res, next, id){
             var j = {
               word: (item.related_word_id == req.obs.Word.id) ? item.word_name : item.related_word_name,
               id:   (item.related_word_id == req.obs.Word.id) ? item.word_id : item.related_word_id,
-              rel: item.b3
+              rel: item.b3,
+              dist: item.dist,
+              uses: item.uses,
             }
             result.push(j);
         }
