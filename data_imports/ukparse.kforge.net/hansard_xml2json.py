@@ -8,6 +8,9 @@ import datetime
 import psycopg2
 from dateutil.parser import parse as parse_date
 from BeautifulSoup import BeautifulSoup
+from HTMLParser import HTMLParser
+
+
 
 
 # Constants --------------------------------------------------------------------
@@ -68,7 +71,7 @@ def get_hansard_page_xml(report_type, date, page):
             xml_data = urllib2.urlopen(url, timeout=10).read()
         except urllib2.HTTPError as http_error:
             response = http_error.read()
-        
+        #if xml_data:
         file = open(cached_filename, 'a')
         file.write(xml_data)
         file.close()
@@ -82,7 +85,7 @@ def get_hansard_data(report_type, date, hansard_data=None):
     Hansard dates may take multiple pages
     Attempt the pages from 1 to infinity, exit on http not found error
     """
-    if not hansard_data:
+    if not isinstance(hansard_data, list):
         hansard_data = []
     
     page = 1
@@ -119,20 +122,21 @@ def parse_hansard_xml(xml_data, hansard_data, source_url, date):
             minor_heading = ''
             details       = ''
             major_heading = tag.text
+            #print major_heading
         if name == 'minor-heading':
             minor_heading = tag.text
             
         if tag.get('nospeaker'):
-            details += tag.text
+            details += ' %s' % tag.text
             
-        if tag.get('speakerid'):            
+        if tag.get('speakerid'):
             hansard_data.append(
                 {
                     'speakerid'  : tag.get('speakerid'  ),
                     'speakername': tag.get('speakername'),
                     'url'        : tag.get('url')        ,
-                    'text'       : tag.text              ,
-                    'context'    : ' '.join([major_heading, minor_heading, details]),
+                    'text'       : HTMLParser.unescape.__func__(HTMLParser, tag.text),
+                    'context'    : HTMLParser.unescape.__func__(HTMLParser, ' '.join([major_heading, minor_heading, details]) ),
                     'timestamp'  : date.strftime('%Y-%m-%d')+' '+tag.get('time'),
                 }
             )
@@ -143,11 +147,13 @@ def parse_hansard_xml(xml_data, hansard_data, source_url, date):
 
 if args.date_range:
     args.date_range = [parse_date(date) for date in args.date_range]
-    day = datetime.timedelta(day=1)
+    day = datetime.timedelta(days=1)
     date = args.date_range[0]
     hansard_data = []
-    while date < args.date_range[1]:
+    while date <= args.date_range[1]:
         get_hansard_data(args.report_type, date, hansard_data=hansard_data)
+        print "%s - %d total data entries" % (date, len(hansard_data))
+        date += day
     
 elif args.date:
     hansard_data = get_hansard_data(args.report_type, args.date)
