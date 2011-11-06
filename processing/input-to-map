@@ -14,7 +14,7 @@ stop_words = [w.strip() for w in file("stop-words.txt").readlines()]
 
 def stem(word):
     word = word.lower()
-    for letter in "!?.,":
+    for letter in "():;!?.,":
         word = word.replace(letter, "")
     return stemmer.stemWord(word)
 
@@ -28,7 +28,6 @@ def create_processed_tables(conn):
 
     cursor.execute("DROP TABLE IF EXISTS word CASCADE")
     cursor.execute("CREATE TABLE word(id serial primary key, name text not null)")
-    cursor.execute("CREATE INDEX stemmed_word on word(ts_lexize('english_stem', name))")
 
     cursor.execute("DROP TABLE IF EXISTS person_word CASCADE")
     cursor.execute("CREATE TABLE person_word(person_id integer references person(id), date date, related_word_id integer references word(id), uses integer not null default 0)")
@@ -39,92 +38,76 @@ def create_processed_tables(conn):
     cursor.execute("DROP TABLE IF EXISTS word_word_distance CASCADE")
     cursor.execute("CREATE TABLE word_word_distance(person_id integer references person(id), date date, word_id integer references word(id), related_word_id integer references word(id), dist integer not null default 0, uses integer not null default 0)")
 
-word_id_cache = {}
-
-def get_word_id(conn, name):
-    if name in word_id_cache:
-        return word_id_cache[name]
-    stemmed_name = stem(name)
+def process(conn):
+    print "*** Processing people"
     cursor = conn.cursor()
-    cursor.execute("SELECT id FROM word WHERE ts_lexize('english_stem', name) = ts_lexize('english_stem', %s)", (stemmed_name, ))
-    row = cursor.fetchone()
-    if row:
-        word_id = row[0]
-    else:
-        cursor.execute("INSERT INTO word(name) VALUES (%s) RETURNING id" , (name, ))
-        word_id = cursor.fetchone()[0]
-    word_id_cache[name] = word_id
-    return word_id
+    cursor.execute("DELETE FROM person")
+    cursor.execute("INSERT INTO person(id, name) (SELECT DISTINCT speakerid, max(speakername) FROM input GROUP BY speakerid)")
 
+    word_idx = {}
+    person_words = {}
 
-person_words = {}
+    # speaker word distance stuff
+    swpa = {}
 
-def add_person_word(conn, person_id, word_id):
-    if person_id not in person_words:
-        person_words[person_id] = {}
-    if word_id not in person_words[person_id]:
-        person_words[person_id][word_id] = 0
-    person_words[person_id][word_id] = person_words[person_id][word_id] + 1
-    #cursor = conn.cursor()
-    #cursor.execute("SELECT uses FROM person_word WHERE person_id=%s AND related_word_id=%s", (person_id, word_id))
-    #row = cursor.fetchone()
-    #if row:
-    #    cursor.execute("UPDATE person_word SET uses = uses + 1 WHERE person_id=%s AND related_word_id=%s", (person_id, word_id))
-    #else:
-    #    cursor.execute("INSERT INTO person_word (person_id, related_word_id, uses) VALUES (%s, %s, 1)", (person_id, word_id))
+    print "*** Processing events"
+    cursor.execute("SELECT timestamp, speakerid, text FROM input")
+    for counter, (timestamp, person_id, body) in enumerate(cursor):
+        if counter % 100 == 0:
+            print "processed %d events" % counter
+        #print "%s %20s %s" % (time, name, body[:40])
 
+        try:
+            dtime = parse_date(timestamp)
+        except:
+            dtime = parse_date('%s 00:00:00' % timestamp.split(' ',2)[0])
 
-def commit_words(conn):
+        for sentence in body.split('.'):
+            words = re.split('[^\w]+', sentence)
+            for i, word in enumerate(words):
+                # normalise
+                word = word.lower()
+                for letter in "();:!?.,":
+                    word = word.replace(letter, "")
+                # filter
+                if word in stop_words or len(word) == 0:
+                    continue
+                # convert to ID
+                if word not in word_idx:
+                    word_idx[word] = len(word_idx)
+                word_id = word_idx[word]
+                # relate to person
+                if person_id not in person_words:
+                    person_words[person_id] = {}
+                if word_id not in person_words[person_id]:
+                    person_words[person_id][word_id] = 0
+                person_words[person_id][word_id] = person_words[person_id][word_id] + 1
+
+                if i < 1:
+                  continue
+                w_id = word_idx[word]
+                lr = i-6 if i-6 > 0 else 0
+                for ia in range (lr, i-1):
+                    w2 = words[ia]
+                    w2 = w2.lower()
+                    if w2 in stop_words or len(w2) == 0:
+                        continue
+                    w2_id = word_idx[w2]
+                    w_id, w2_id = sorted([w_id, w2_id])
+                    key = (person_id, dtime.date(), w_id, w2_id, i-ia)
+              
+                    swpa[key] = swpa.get(key, 0) + 1
+                
     cursor = conn.cursor()
+    for word in word_idx:
+        cursor.execute("INSERT INTO word (id, name) VALUES (%s, %s)", (word_idx[word], word))
+
     for person_id in person_words:
         print "Committing words for person %d" % person_id
         for word_id in person_words[person_id]:
             cursor.execute("INSERT INTO person_word (person_id, related_word_id, uses) VALUES (%s, %s, %s)", (person_id, word_id, person_words[person_id][word_id]))
 
-word_distances = {}
-
-
-def process(conn):
-    print "*** Processing"
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM person")
-    cursor.execute("INSERT INTO person(id, name) (SELECT DISTINCT speakerid, max(speakername) FROM input GROUP BY speakerid)")
-
-    cursor.execute("SELECT timestamp, speakerid, speakername, text FROM input")
-    swpa = {}
-    for counter, (time, person_id, name, body) in enumerate(cursor):
-        print "processed %d events" % counter
-        try:
-            dtime = parse_date(time)
-        except:
-            dtime = parse_date('%s 00:00:00' % time.split(' ',2)[0])
-        for word in body.split():
-            word = word.lower()
-            if word not in stop_words:
-                word_id = get_word_id(conn, word)
-                add_person_word(conn, person_id, word_id)
-        # TODO: relate words to other words
-        #print "%s %20s %s" % (time, name, body[:40])
-        sentences = body.split('.')
-        for sentence in sentences:
-            sentence_word_positions={}
-            words = re.split('[^\w]', sentence)
-            count = 0
-            for i, word in enumerate(words):
-                word = word.lower()
-                if word in stop_words or i == 0 or len(word)==0:
-                    continue
-                word_id = get_word_id(conn, word)
-                lr = i-6 if i-6 >= 0 else 0
-                for ia in range(lr, i-1):
-                    word2 = words[ia].lower()
-                    if word2 in stop_words or len (word2)==0:
-                        continue
-                    word_id2 = get_word_id(conn, word2)
-                    word_id, word_id2 = sorted([word_id, word_id2])
-                    key = (person_id, dtime.date(), word_id, word_id2, i-ia)
-                    swpa[key] = swpa.get(key, 0) + 1
-    commit_words(conn)
+    #commit_words(conn)
     dist_len = len(swpa)
     i = 0
     for k,v in swpa.iteritems():
@@ -133,6 +116,11 @@ def process(conn):
         pid, dt, w1, w2, d = k
         cursor.execute("INSERT INTO word_word_distance (person_id, date, word_id, related_word_id, dist, uses) VALUES (%s, %s, %s, %s, %s, %s)", (pid, dt.isoformat(), w1, w2, d, v))
 
+def create_indexes(conn):
+    cursor = conn.cursor()
+    #cursor.execute("CREATE INDEX stemmed_word on word(ts_lexize('english_stem', name))")
+    cursor.execute("CREATE INDEX person_word__person ON person_word(person_id)")
+    cursor.execute("CREATE INDEX person_word__word ON person_word(related_word_id)")
 
 def print_results(conn):
     print "*** Results"
@@ -158,6 +146,7 @@ def main():
 
     create_processed_tables(conn)
     process(conn)
+    create_indexes(conn)
     print_results(conn)
 
     conn.commit()

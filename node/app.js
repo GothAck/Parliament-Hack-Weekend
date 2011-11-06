@@ -99,8 +99,16 @@ app.get('/person/search/:person_name.:format?', function(req, res){
 });
 
 app.get('/person/:person_id.:format?', function(req, res){
+  var min = 9001;
+  var max = 0;
+  req.obs.Person.words.forEach(function(f) {
+  	min = Math.min(min, f.uses);
+  	max = Math.max(max, f.uses);
+  });
   res.render('person', {
     person: req.obs.Person,
+	min_uses: min,
+	max_uses: max,
   });
 });
 
@@ -124,8 +132,16 @@ app.get('/word/search/:word_string.:format?', function(req, res){
 });
 
 app.get('/word/:word_id.:format?', function(req, res){
+  var min = 9001;
+  var max = 0;
+  req.obs.Word.people.forEach(function(f) {
+  	min = Math.min(min, f.uses);
+  	max = Math.max(max, f.uses);
+  });
   res.render('word', {
     word: req.obs.Word,
+	min_uses: min,
+	max_uses: max,
   });
 });
 
@@ -146,10 +162,11 @@ app.get('/word.:formatr?', function(req, res, next){
 app.param('person_id', function(req, res, next, id){
   Person.find(
     id,
-    { include: { words: { limit: req.query.limit || 10, offset: req.query.offset || 0, order: ['-uses'], include: { word: {} } } } },
+    { include: { words: { limit: req.query.limit || 50, offset: req.query.offset || 0, order: ['-uses'], include: { word: {} } } } },
     function (err, result) {
       if (err) return next(err);
       if (!req.obs) req.obs = {};
+	  result.words.sort(function(a, b) {return a.word.name > b.word.name ? 1 : -1;});
       req.obs.Person = result;
       console.log(JSON.stringify(result));
       next();
@@ -161,7 +178,7 @@ app.param('person_name', function(req, res, next, id){
   console.log('searching for person_name', id);
   if (id) id = '%' + id + '%';
   if (!id) id = '%';
-  Person.find({'name.ilike': id}, { limit: req.query.limit || 10, offset: req.query.offset || 0 }, function (err, result) {
+  Person.find({'name.ilike': id}, { limit: req.query.limit || 20, offset: req.query.offset || 0 }, function (err, result) {
     if (err) return next(err);
     if (!req.obs) req.obs = {};
     req.obs.People = result;
@@ -173,10 +190,11 @@ app.param('person_name', function(req, res, next, id){
 app.param('word_id', function(req, res, next, id){
   Word.find(
     id,
-    { include: { people: { limit: req.query.limit || 10, offset: req.query.offset || 0, order: ['-uses'], include: { person: {} } } } },
+    { include: { people: { limit: req.query.limit || 20, offset: req.query.offset || 0, order: ['-uses'], include: { person: {} } } } },
     function (err, result) {
       if (err) return next(err);
       if (!req.obs) req.obs = {};
+	  result.people.sort(function(a, b) {return a.person.name > b.person.name ? 1 : -1;});
       req.obs.Word = result;
       WordDistance.find(
         {word_id: id},
@@ -194,7 +212,7 @@ app.param('word_id', function(req, res, next, id){
 app.param('word_string', function(req, res, next, id){
   if (id) id = '%' + id + '%';
   if (!id) id = '%';
-  Word.find({'name.ilike': '%'+id+'%'}, { limit: req.query.limit || 10, offset: req.query.offset || 0 }, function (err, result) {
+  Word.find({'name.ilike': '%'+id+'%'}, { limit: req.query.limit || 20, offset: req.query.offset || 0 }, function (err, result) {
     if (err)
       next(err);
     if (!req.obs) req.obs = {};
