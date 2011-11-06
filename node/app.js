@@ -152,6 +152,16 @@ app.get('/word.:formatr?', function(req, res, next){
   next();
 });
 
+app.get('/references/:person_id/:word.:format?', function(req, res){
+  res.render('references', {
+  	name: req.obs.Person.name,
+	word: req.params.word,
+	// SELECT url, text, timestamp FROM input WHERE speakerid=%s AND to_tsvector(text) @@ %s::tsquery
+	references: [{url: "blag", timestamp: "bloh", text: "wibble wobble"}],
+  });
+});
+
+
 // Parameter pre-processing
 
 app.param('person_id', function(req, res, next, id){

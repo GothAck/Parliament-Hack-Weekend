@@ -1,0 +1,7 @@
+<h1>Where has ${name} talked about ${word}?</h1>
+
+<ul>
+{{each reference}}
+  <a href="${$value.url}">${$value.timestamp} -- ${$value.text}</a>
+{{/each}}
+</ul>
