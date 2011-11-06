@@ -1,4 +1,4 @@
-<h1>${person.name}</h1>
+<h1>What's ${person.name} talking about?</h1>
 <!--${person.name}-->
 <!--<h2>Used words</h2>-->
 <div style="text-align: center;">
@@ -7,3 +7,6 @@
   href="/word/${$value.word.id}">${$value.word.name}<!-- <b>${$value.uses} times</b>--></a>
 {{/each}}
 </div>
+<h2>More Info about ${person.name}</h2>
+<a href="http://www.theyworkforyou.com/mp/?m=${person.id}">TheyWorkForYou Profile</a>
+<br><a href="http://www.publicwhip.org.uk/mp.php?id=uk.org.publicwhip/member/${person.id}&showall=yes">Public Whip Profile</a>
