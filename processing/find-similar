@@ -24,7 +24,7 @@ def main():
         # for each word, find the top 10 users of that word
         my_word_id = my_word_row[0]
         #cursor.execute("SELECT person_id FROM person_word WHERE related_word_id=%s ORDER BY uses DESC LIMIT 10", (my_word_id, ))
-        cursor.execute("select person_id, uses::decimal/(select sum(uses) from person_word as ipw where ipw.person_id=person_word.person_id) as uses_proportion from person_word where related_word_id=%s order by uses_proportion desc limit 10", (my_word_id, ))
+        cursor.execute("select person_id, uses_proportion from person_word_proportional where related_word_id=%s order by uses_proportion desc limit 10", (my_word_id, ))
         for person in cursor.fetchall():
             # add those users to a list
             person_id = person[0]

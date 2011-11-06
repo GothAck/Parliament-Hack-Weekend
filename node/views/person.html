@@ -1,10 +1,33 @@
 <h1>What's ${person.name} talking about?</h1>
 <!--${person.name}-->
 <!--<h2>Used words</h2>-->
+<style>
+.tag {
+	display: inline-block;
+	vertical-align: middle;
+	text-decoration: none;
+	padding-left: 0.5em;
+}
+.extra {
+	padding-right: 0.5em;
+}
+.item A {
+	text-decoration: none;
+	vertical-align: middle;
+}
+.item .extra {
+	visibility: hidden;
+}
+.item:hover .extra {
+	visibility: visible;
+}
+</style>
 <div style="text-align: center;">
 {{each person.words}}
-  <a style="display:inline-block; vertical-align:middle; text-decoration: none; padding: 0em 0.5em; font-size: ${Math.max(10, Math.log($value.uses - min_uses + 1)*10)}px"
-  href="/word/${$value.word.id}">${$value.word.name}<!-- <b>${$value.uses} times</b>--></a>
+  <span class="item" style="font-size: ${Math.max(10, Math.log($value.uses - min_uses + 1)*10)}px">
+	  <a class="tag" href="/word/${$value.word.id}">${$value.word.name}</a>
+	  <a class="extra" href="/references/${person.id}/${$value.word.name}">?</a>
+  </span>
 {{/each}}
 </div>
 <h2>More Info about ${person.name}</h2>

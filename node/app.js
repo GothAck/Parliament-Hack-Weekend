@@ -21,8 +21,12 @@ FastLegS.connect(dbParams);
 
 // FastLegS Table definitions
 
+var Input = FastLegS.Base.extend({
+  tableName: 'input',
+});
+
 var PersonWord = FastLegS.Base.extend({
-  tableName: 'person_word',
+  tableName: 'person_word_proportional',
   primaryKey: ['person_id', 'related_word_id'],
 });
 
@@ -157,7 +161,33 @@ app.get('/word.:formatr?', function(req, res, next){
   next();
 });
 
+app.get('/references/:person_id/:reference_word.:format?', function(req, res){
+    res.render('references', {
+      name: req.obs.Person.name,
+      word: req.params.reference_word,
+      references: req.obs.references,
+    });
+});
+
+
 // Parameter pre-processing
+
+app.param('reference_word', function(req, res, next, id){
+  var query = "SELECT url, ts_headline(text, $1::tsquery), timestamp FROM input WHERE speakerid=$2 AND to_tsvector(text) @@ $1::tsquery";
+  query = FastLegS.client.client.query(query, [id, req.obs.Person.id]);
+
+  var results = [];
+  query.on('error', function(err) {
+  	console.log(err);
+  });
+  query.on('row', function(row) {
+  	results.push(row);
+  });
+  query.on('end', function() {
+    req.obs.references = results;
+	next();
+  });
+});
 
 app.param('person_id', function(req, res, next, id){
   Person.find(
@@ -190,7 +220,7 @@ app.param('person_name', function(req, res, next, id){
 app.param('word_id', function(req, res, next, id){
   Word.find(
     id,
-    { include: { people: { limit: req.query.limit || 20, offset: req.query.offset || 0, order: ['-uses'], include: { person: {} } } } },
+    { include: { people: { limit: req.query.limit || 20, offset: req.query.offset || 0, order: ['-uses_proportion'], include: { person: {} } } } },
     function (err, result) {
       if (err) return next(err);
       if (!req.obs) req.obs = {};
