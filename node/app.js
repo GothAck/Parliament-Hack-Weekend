@@ -22,7 +22,7 @@ FastLegS.connect(dbParams);
 // FastLegS Table definitions
 
 var PersonWord = FastLegS.Base.extend({
-  tableName: 'person_word',
+  tableName: 'person_word_proportional',
   primaryKey: ['person_id', 'related_word_id'],
 });
 
@@ -187,7 +187,7 @@ app.param('person_name', function(req, res, next, id){
 app.param('word_id', function(req, res, next, id){
   Word.find(
     id,
-    { include: { people: { limit: req.query.limit || 20, offset: req.query.offset || 0, order: ['-uses'], include: { person: {} } } } },
+    { include: { people: { limit: req.query.limit || 20, offset: req.query.offset || 0, order: ['-uses_proportion'], include: { person: {} } } } },
     function (err, result) {
       if (err)
         throw new Error();
