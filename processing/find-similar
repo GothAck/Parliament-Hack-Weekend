@@ -1,0 +1,45 @@
+#!/usr/bin/python
+
+import os
+import sys
+import psycopg2
+
+
+def main():
+    conn_string = "host='localhost' dbname='%(user)s' user='%(user)s' password='%(user)s'" % {'user': os.environ['USER']}
+    conn = psycopg2.connect(conn_string)
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM person WHERE name=%s", (sys.argv[1], ))
+    r = cursor.fetchone()
+    if not r:
+        print "Member not found"
+        return 1
+    p_id = r[0]
+
+    # find this person's top 10 words
+    nearby_people = {}
+    cursor.execute("SELECT related_word_id FROM person_word WHERE person_id=%s ORDER BY uses DESC LIMIT 10", (r[0], ))
+    for my_word_row in cursor.fetchall():
+        # for each word, find the top 10 users of that word
+        my_word_id = my_word_row[0]
+        #cursor.execute("SELECT person_id FROM person_word WHERE related_word_id=%s ORDER BY uses DESC LIMIT 10", (my_word_id, ))
+        cursor.execute("select person_id, uses::decimal/(select sum(uses) from person_word as ipw where ipw.person_id=person_word.person_id) as uses_proportion from person_word where related_word_id=%s order by uses_proportion desc limit 10", (my_word_id, ))
+        for person in cursor.fetchall():
+            # add those users to a list
+            person_id = person[0]
+            if person_id not in nearby_people:
+                nearby_people[person_id] = 0
+            nearby_people[person_id] = nearby_people[person_id] + 1
+
+    to_sort = []
+    for person_id in nearby_people:
+        cursor.execute("SELECT name FROM person WHERE id=%s", (person_id, ))
+        to_sort.append((nearby_people[person_id], cursor.fetchone()[0]))
+    to_sort.sort()
+    to_sort.reverse()
+    print to_sort[:10]
+
+if __name__ == "__main__":
+    main()
+
