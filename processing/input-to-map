@@ -35,40 +35,47 @@ def create_processed_tables(conn):
 
 
 def process(conn):
-    print "*** Processing"
+    print "*** Processing people"
     cursor = conn.cursor()
     cursor.execute("DELETE FROM person")
     cursor.execute("INSERT INTO person(id, name) (SELECT DISTINCT speakerid, max(speakername) FROM input GROUP BY speakerid)")
 
-    word_list = []
+    word_idx = {}
     person_words = {}
 
+    print "*** Processing events"
     cursor.execute("SELECT speakerid, text FROM input")
     for counter, (person_id, body) in enumerate(cursor):
-        print "processed %d events" % counter
-        for word in body.split():
-            if word not in stop_words:
-
-                word = word.lower()
-                for letter in "!?.,":
-                    word = word.replace(letter, "")
-
-                if word not in word_list:
-                    word_list.append(word)
-
-                word_id = word_list.index(word)
-
-                if person_id not in person_words:
-                    person_words[person_id] = {}
-                if word_id not in person_words[person_id]:
-                    person_words[person_id][word_id] = 0
-                person_words[person_id][word_id] = person_words[person_id][word_id] + 1
-
-        # TODO: relate words to other words
+        if counter % 100 == 0:
+            print "processed %d events" % counter
         #print "%s %20s %s" % (time, name, body[:40])
+
+        for word in body.split():
+            # normalise
+            word = word.lower()
+            for letter in "!?.,":
+                word = word.replace(letter, "")
+
+            # filter
+            if word in stop_words:
+                continue
+
+            # convert to ID
+            if word not in word_idx:
+                word_idx[word] = len(word_idx)
+            word_id = word_idx[word]
+
+            # relate words to person
+            if person_id not in person_words:
+                person_words[person_id] = {}
+            if word_id not in person_words[person_id]:
+                person_words[person_id][word_id] = 0
+            person_words[person_id][word_id] = person_words[person_id][word_id] + 1
+
+            # TODO: relate words to other words
     cursor = conn.cursor()
-    for n, word in enumerate(word_list):
-        cursor.execute("INSERT INTO word (id, name) VALUES (%s, %s)", (n, word))
+    for word in word_idx:
+        cursor.execute("INSERT INTO word (id, name) VALUES (%s, %s)", (word_idx[word], word))
 
     for person_id in person_words:
         print "Committing words for person %d" % person_id
