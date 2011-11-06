@@ -1,0 +1,46 @@
+@mixin border_radius($rad)
+    border-radius        : $rad
+    -moz-border-radius   : $rad
+    -webkit-border-radius: $rad
+
+@mixin drop_shadow($offset-x, $offset-y, $size, $color)
+    -moz-box-shadow:    $offset-x $offset-y $size $color
+    -webkit-box-shadow: $offset-x $offset-y $size $color
+    box-shadow:         $offset-x $offset-y $size $color
+
+@mixin transparency($total)
+    opacity: $total/100
+    filter:alpha(opacity=$total)
+
+$content-width: 900px
+
+HTML, body
+    background-color: #a4b7e0
+    font: 14px "Lucida Grande", Helvetica, Arial, sans-serif 
+    padding: 0
+    margin: 0
+    color: #333
+
+a
+    color: #a4b7e0
+    &:hover
+        color: #4e6493
+
+.header, .wrapper, .footer
+    width: $content-width
+    margin: 0 auto 0 auto
+    padding: 1em
+
+.header
+    img
+        max-height: 100px
+
+.wrapper
+    @include drop_shadow(0, 0, 0.5em, #333)
+    background-color: #fff
+
+.footer
+    text-align: center
+    color: #fff
+    font-size: 80%
+    text-shadow: #666 1px 1px 1px

@@ -1,6 +1,31 @@
-body {
-  padding: 50px;
-  font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;}
+HTML, body {
+  background-color: #a4b7e0;
+  font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+  padding: 0;
+  margin: 0;
+  color: #333333; }
 
 a {
-  color: #00B7FF;}
+  color: #a4b7e0; }
+  a:hover {
+    color: #4e6493; }
+
+.header, .wrapper, .footer {
+  width: 900px;
+  margin: 0 auto 0 auto;
+  padding: 1em; }
+
+.header img {
+  max-height: 100px; }
+
+.wrapper {
+  -moz-box-shadow: 0 0 0.5em #333333;
+  -webkit-box-shadow: 0 0 0.5em #333333;
+  box-shadow: 0 0 0.5em #333333;
+  background-color: white; }
+
+.footer {
+  text-align: center;
+  color: white;
+  font-size: 80%;
+  text-shadow: #666666 1px 1px 1px; }
