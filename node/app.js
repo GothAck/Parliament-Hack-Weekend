@@ -9,7 +9,6 @@ var FastLegS = require('FastLegS');
 // FastLegS Config
 
 var user = process.env['USER'];
-console.log('user', user);
 var dbParams = {
   user:     user,
   password: user,
