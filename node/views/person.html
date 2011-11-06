@@ -3,6 +3,7 @@ ${person.name}
 <h2>Used words</h2>
 <ul>
 {{each person.words}}
-  <li><a href="/word/${$value.word.id}">${$value.word.name} <b>${$value.uses} times</b></a></li>
+  <a style="font-size: ${Math.max(10, Math.log($value.uses - min_uses + 1)*10)}px"
+  href="/word/${$value.word.id}">${$value.word.name}<!-- <b>${$value.uses} times</b>--></a>
 {{/each}}
 </ul>
