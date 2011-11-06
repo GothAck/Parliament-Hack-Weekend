@@ -224,17 +224,27 @@ app.param('word_id', function(req, res, next, id){
     function (err, result) {
       if (err) return next(err);
       if (!req.obs) req.obs = {};
-	  result.people.sort(function(a, b) {return a.person.name > b.person.name ? 1 : -1;});
+	    result.people.sort(function(a, b) {return a.person.name > b.person.name ? 1 : -1;});
       req.obs.Word = result;
-      WordDistance.find(
-        {word_id: id},
-        { limit: 10 },
-        function (err, result) {
-          if (err) return next(err);
-          req.obs.WordDistance1 = result
-          next();
+      var query = "SELECT *, (SELECT name from word where id=word_id) as word_name, (SELECT name FROM word WHERE id=related_word_id) as related_word_name, ((6-dist)*(6-dist))*uses as b3 FROM word_word_distance WHERE dist < 5 AND (word_id = $1 OR related_word_id = $1) ORDER BY b3 LIMIT 15";
+      FastLegS.client.client.query(query, [result.id], function (err, res) {
+        console.log(err);
+        if (err) return next(err);
+        var result = [];
+        console.log(res.rows);
+        for (var i in res.rows) {
+            var item = res.rows[i];
+            console.log(item, req.obs);
+            var j = {
+              word: (item.related_word_id == req.obs.Word.id) ? item.word_name : item.related_word_name,
+              id:   (item.related_word_id == req.obs.Word.id) ? item.word_id : item.related_word_id,
+              rel: item.b3
+            }
+            result.push(j);
         }
-      );
+        req.obs.WordDistance = result;
+        next();
+      });
     }
   );
 });
