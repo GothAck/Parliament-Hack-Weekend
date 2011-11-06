@@ -11,7 +11,7 @@ stop_words = [w.strip() for w in file("stop-words.txt").readlines()]
 
 def stem(word):
     word = word.lower()
-    for letter in "!?.,":
+    for letter in "():;!?.,":
         word = word.replace(letter, "")
     return stemmer.stemWord(word)
 
@@ -52,7 +52,7 @@ def process(conn):
         for word in body.split():
             # normalise
             word = word.lower()
-            for letter in "!?.,":
+            for letter in "();:!?.,":
                 word = word.replace(letter, "")
 
             # filter
