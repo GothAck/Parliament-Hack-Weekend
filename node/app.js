@@ -74,6 +74,12 @@ app.configure(function(){
   app.use(express.cookieParser());
 //  app.use(express.session({ secret: 'ajfihuc43fu34uxmiqe4fdjwefu3u4ure' }));
 //  app.use(express.compiler({ src: __dirname + '/public', enable: ['sass'] }));
+// GregM: Custom Middleware to set req.obs object & populate with query string items
+  app.use(function (req, res, next) {
+    if (!req.obs) req.obs = {};
+    req.obs.query = req.query;
+    next();
+  });
   app.use(app.router);
   app.use(express.static(__dirname + '/public'));
 });
@@ -123,8 +129,7 @@ app.get('/person.:formatr?', function(req, res, next){
   } else if ('person_name' in req.query) {
     res.redirect('/person/search/'+req.query.person_name+format);
   } else {
-    
-    // Base return
+    res.redirect('/person/search/_'+format);
   }
   next();
 });
@@ -145,8 +150,8 @@ app.get('/word/:word_id.:format?', function(req, res){
   res.render('word', {
     word: req.obs.Word,
     distance: req.obs.WordDistance,
-	min_uses: min,
-	max_uses: max,
+	  min_uses: min,
+	  max_uses: max,
   });
 });
 
@@ -157,7 +162,7 @@ app.get('/word.:formatr?', function(req, res, next){
   } else if ('word_string' in req.query) {
     res.redirect('/word/search/'+req.query.word_string+format);
   } else {
-    // Base return
+    res.redirect('/word/search/_'+format);
   }
   next();
 });
@@ -175,18 +180,10 @@ app.get('/references/:person_id/:reference_word.:format?', function(req, res){
 
 app.param('reference_word', function(req, res, next, id){
   var query = "SELECT url, ts_headline(text, $1::tsquery), timestamp FROM input WHERE speakerid=$2 AND to_tsvector(text) @@ $1::tsquery";
-  query = FastLegS.client.client.query(query, [id, req.obs.Person.id]);
-
-  var results = [];
-  query.on('error', function(err) {
-  	console.log(err);
-  });
-  query.on('row', function(row) {
-  	results.push(row);
-  });
-  query.on('end', function() {
-    req.obs.references = results;
-	next();
+  query = FastLegS.client.client.query(query, [id, req.obs.Person.id], function(err, results) {
+    if (err) return next(err);
+    req.obs.references = results.rows;
+    next();
   });
 });
 
@@ -196,10 +193,8 @@ app.param('person_id', function(req, res, next, id){
     { include: { words: { limit: req.query.limit || 50, offset: req.query.offset || 0, order: ['-uses'], include: { word: {} } } } },
     function (err, result) {
       if (err) return next(err);
-      if (!req.obs) req.obs = {};
-	  result.words.sort(function(a, b) {return a.word.name > b.word.name ? 1 : -1;});
+      result.words.sort(function(a, b) {return a.word.name > b.word.name ? 1 : -1;});
       req.obs.Person = result;
-      console.log(JSON.stringify(result));
       next();
     }
   );
@@ -211,9 +206,8 @@ app.param('person_name', function(req, res, next, id){
   if (!id) id = '%';
   Person.find({'name.ilike': id}, { limit: req.query.limit || 20, offset: req.query.offset || 0 }, function (err, result) {
     if (err) return next(err);
-    if (!req.obs) req.obs = {};
     req.obs.People = result;
-    console.log(JSON.stringify(result));
+    //console.log(JSON.stringify(result));
     next();
   });
 });
@@ -224,27 +218,24 @@ app.param('word_id', function(req, res, next, id){
     { include: { people: { limit: req.query.limit || 20, offset: req.query.offset || 0, order: ['-uses_proportion'], include: { person: {} } } } },
     function (err, result) {
       if (err) return next(err);
-      if (!req.obs) req.obs = {};
 	    result.people.sort(function(a, b) {return a.person.name > b.person.name ? 1 : -1;});
       req.obs.Word = result;
       var query = "SELECT *, (SELECT name from word where id=word_id) as word_name, (SELECT name FROM word WHERE id=related_word_id) as related_word_name, ((6-dist)*(6-dist))*uses as b3 FROM word_word_distance WHERE dist < 5 AND (word_id = $1 OR related_word_id = $1) ORDER BY b3 LIMIT 15";
-      FastLegS.client.client.query(query, [result.id], function (err, res) {
-        console.log(err);
-        if (err) return next(err);
-        var result = [];
-        console.log(res.rows);
-        for (var i in res.rows) {
-            var item = res.rows[i];
-            console.log(item, req.obs);
-            var j = {
-              word: (item.related_word_id == req.obs.Word.id) ? item.word_name : item.related_word_name,
-              id:   (item.related_word_id == req.obs.Word.id) ? item.word_id : item.related_word_id,
-              rel: item.b3,
-              dist: item.dist,
-              uses: item.uses,
-            }
-            result.push(j);
-        }
+      query = FastLegS.client.client.query(query, [result.id]);
+      query.on('error', function (err) {
+        next(err);
+      });
+      var result = [];
+      query.on('row', function (item) {
+        result.push({
+          word: (item.related_word_id == req.obs.Word.id) ? item.word_name : item.related_word_name,
+          id:   (item.related_word_id == req.obs.Word.id) ? item.word_id : item.related_word_id,
+          rel:  item.b3,
+          dist: item.dist,
+          uses: item.uses,
+        });
+      });
+      query.on('end', function () {
         req.obs.WordDistance = result;
         next();
       });
@@ -258,7 +249,6 @@ app.param('word_string', function(req, res, next, id){
   Word.find({'name.ilike': '%'+id+'%'}, { limit: req.query.limit || 20, offset: req.query.offset || 0 }, function (err, result) {
     if (err)
       next(err);
-    if (!req.obs) req.obs = {};
     req.obs.Words = result;
     next();
   });
