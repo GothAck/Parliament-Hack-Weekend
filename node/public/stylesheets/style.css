@@ -11,7 +11,8 @@ a {
     color: #4e6493; }
 
 .item {
-  white-space: nowrap; }
+  white-space: nowrap;
+  display: inline-block; }
 
 .header, .wrapper, .footer {
   width: 900px;
