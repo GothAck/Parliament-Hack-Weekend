@@ -1,0 +1,1 @@
+select *, (select name from word where id = word_id) as a, (select name from word where id = related_word_id) as b, uses*uses+dist as b1, dist*dist+uses as b2, ((-dist) * (6-dist)) * uses as b3 from word_word_distance where dist < 5 order by b3 desc;
