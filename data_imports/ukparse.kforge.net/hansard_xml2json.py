@@ -199,6 +199,9 @@ elif args.db_out:
             )
         )
     conn.commit()
+    cursor.execute("UPDATE input SET timestamp = overlay(timestamp placing '' from 12 for 1) WHERE length(timestamp) = 20")
+    
+    conn.commit()
 else:
     import pprint
     pprint.pprint(hansard_data)
