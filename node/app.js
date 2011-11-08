@@ -1,4 +1,9 @@
 
+process.on('uncaughtException', function (err) {
+  console.log('uncaughtException', err, err.stack);
+  console.trace();
+});
+
 /**
  * Module dependencies.
  */
@@ -6,9 +11,13 @@
 var express = require('express');
 var FastLegS = require('FastLegS');
 
+// Express app creation
+
+var app = module.exports = express.createServer();
+
 // FastLegS Config
 
-var user = process.env['USER'];
+var user = (app.settings.env=='production') ? 'greg' : process.env['USER'];
 var dbParams = {
   user:     user,
   password: user,
@@ -59,9 +68,20 @@ PersonWord.one = [
   {'word': Word, joinOn: 'related_word_id'}
 ]
 
-// Express app creation
+// Custom Errors
 
-var app = module.exports = express.createServer();
+function NotFound(msg) {
+  this.name="NotFound";
+  Error.call(this, msg);
+  Error.captureStackTrace(this, arguments.callee);
+}
+function InvalidParam(msg) {
+  this.name="InvalidParam";
+  Error.call(this, msg);
+  Error.captureStackTrace(this, arguments.callee);
+}
+
+NotFound.prototype.__proto__ = Error.prototype;
 
 // Configuration
 
@@ -82,6 +102,10 @@ app.configure(function(){
   });
   app.use(app.router);
   app.use(express.static(__dirname + '/public'));
+// GregM: If the middleware processing gets to here then nothing has been found in routing & static, raise the NotFound error.
+  app.use(function(req, res, next) {
+    next(new NotFound);
+  });
 });
 
 app.configure('development', function(){
@@ -89,10 +113,17 @@ app.configure('development', function(){
 });
 
 app.configure('production', function(){
-  app.use(express.errorHandler()); 
+  // To catch our custom errors we need to use our own error handler
+  app.error(function(err, req, res, next) {
+    if (err instanceof NotFound) {
+      res.render('404.html', {status:404});
+    } else if (err instanceof InvalidParam) {
+      res.render('403.html', {status:403});
+    } else {
+      res.render('500.html', {status:500});
+    }
+  });
 });
-
-
 
 // Routes
 
@@ -175,25 +206,31 @@ app.get('/references/:person_id/:reference_word.:format?', function(req, res){
     });
 });
 
-
-// Parameter pre-processing
-
 app.param('reference_word', function(req, res, next, id){
-  var query = "SELECT url, ts_headline(text, $1::tsquery), timestamp FROM input WHERE speakerid=$2 AND to_tsvector(text) @@ $1::tsquery";
+  if (typeof id != 'string' || id.length > 100)
+    return next(new InvalidParam);
+  var query = "SELECT url, ts_headline(text, to_tsquery($1)), timestamp FROM input WHERE speakerid=$2 AND to_tsvector(text) @@ to_tsquery($1)";
+  console.log(query, [id, req.obs.Person.id]);
   query = FastLegS.client.client.query(query, [id, req.obs.Person.id], function(err, results) {
+    console.log('reference_word', err, results);
     if (err) return next(err);
+    if (!results) return next(new NotFound);
     req.obs.references = results.rows;
     next();
   });
 });
 
 app.param('person_id', function(req, res, next, id){
-  Person.find(
+  if (isNaN(id) || id < 1)
+    return next(new InvalidParam);
+  Person.findOne(
     id,
     { include: { words: { limit: req.query.limit || 50, offset: req.query.offset || 0, order: ['-uses'], include: { word: {} } } } },
     function (err, result) {
+      console.log('rar', result);
       if (err) return next(err);
-      result.words.sort(function(a, b) {return a.word.name > b.word.name ? 1 : -1;});
+      if (!result) return next(new NotFound);
+      if (result.words) result.words.sort(function(a, b) {return a.word.name > b.word.name ? 1 : -1;});
       req.obs.Person = result;
       next();
     }
@@ -201,6 +238,8 @@ app.param('person_id', function(req, res, next, id){
 });
 
 app.param('person_name', function(req, res, next, id){
+  if (typeof id != 'string' || id.length > 100)
+    return next(new InvalidParam);
   console.log('searching for person_name', id);
   if (id) id = '%' + id + '%';
   if (!id) id = '%';
@@ -213,12 +252,15 @@ app.param('person_name', function(req, res, next, id){
 });
 
 app.param('word_id', function(req, res, next, id){
-  Word.find(
+  if (isNaN(id) || id < 1)
+    return next(new InvalidParam);
+  Word.findOne(
     id,
     { include: { people: { limit: req.query.limit || 20, offset: req.query.offset || 0, order: ['-uses_proportion'], include: { person: {} } } } },
     function (err, result) {
       if (err) return next(err);
-	    result.people.sort(function(a, b) {return a.person.name > b.person.name ? 1 : -1;});
+      if (! result) return next(new NotFound);
+	    if (result.people) result.people.sort(function(a, b) {return a.person.name > b.person.name ? 1 : -1;});
       req.obs.Word = result;
       var query = "SELECT *, (SELECT name from word where id=word_id) as word_name, (SELECT name FROM word WHERE id=related_word_id) as related_word_name, ((6-dist)*(6-dist))*uses as b3 FROM word_word_distance WHERE dist < 5 AND (word_id = $1 OR related_word_id = $1) ORDER BY b3 LIMIT 15";
       query = FastLegS.client.client.query(query, [result.id]);
@@ -244,6 +286,8 @@ app.param('word_id', function(req, res, next, id){
 });
 
 app.param('word_string', function(req, res, next, id){
+  if (typeof id != 'string' || id.length > 100)
+    return next(new InvalidParam);
   if (id) id = '%' + id + '%';
   if (!id) id = '%';
   Word.find({'name.ilike': '%'+id+'%'}, { limit: req.query.limit || 20, offset: req.query.offset || 0 }, function (err, result) {
@@ -255,17 +299,20 @@ app.param('word_string', function(req, res, next, id){
 });
 
 app.param('format', function(req, res, next, id){
-console.log(id);
-  if (!id) next();
+  if (typeof id != 'string' )
+    return next(new InvalidParam);
   if (id == 'json') {
-    res.write(JSON.stringify(req.obs));
+    res.json(req.obs);
     res.end();
+    return;
   }
+  console.log('default');
+  next();
 });
 
-app.listen(3001);
+if (app.settings.env == 'production') {
+  app.listen(80, '31.3.241.106');
+} else {
+  app.listen(3001);
+}
 console.log("Express server listening on port %d in %s mode", app.address().port, app.settings.env);
-
-//var repl = require('repl');
-
-//repl.start().context.app = Person;
