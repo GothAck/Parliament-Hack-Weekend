@@ -24,7 +24,7 @@ parser.add_argument('-d' , '--date'       , dest='date'       , type=parse_date 
 parser.add_argument('-dr', '--date_range' , dest='date_range' , nargs=2                                                    , help='date range to rip from')
 parser.add_argument('-o' , '--output'     , dest='file_out'                                                                , help='the outputfile to write to')
 parser.add_argument('-r' , '--report_type', dest='report_type', choices=report_types      , default='debates'              , help='report type to query from %s' % report_types)
-parser.add_argument('-s ', '--source'     , dest='source'     , choices=sources           , default='local_only'           , help='source of data from %s' % sources)
+parser.add_argument('-s ', '--source'     , dest='source'     , choices=sources           , default='ukparse'              , help='source of data from %s' % sources)
 parser.add_argument('-db', '--db'         , dest='db_out'                                                                  , help='output to db')
 parser.add_argument(       '--clean'      , dest='clean'                                                                   , help='wipe / create blank DB first')
 args = parser.parse_args()
