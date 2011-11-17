@@ -25,8 +25,8 @@ parser.add_argument('-dr', '--date_range' , dest='date_range' , nargs=2         
 parser.add_argument('-o' , '--output'     , dest='file_out'                                                                , help='the outputfile to write to')
 parser.add_argument('-r' , '--report_type', dest='report_type', choices=report_types      , default='debates'              , help='report type to query from %s' % report_types)
 parser.add_argument('-s ', '--source'     , dest='source'     , choices=sources           , default='ukparse'              , help='source of data from %s' % sources)
-parser.add_argument('-db', '--db'         , dest='db_out'                                                                  , help='output to db')
-parser.add_argument(       '--clean'      , dest='clean'                                                                   , help='wipe / create blank DB first')
+parser.add_argument(       '--db'         , dest='db_out'     , action="store_true"       , default=False                  , help='output to db')
+parser.add_argument(       '--clean'      , dest='clean'      , action="store_true"       , default=False                  , help='wipe / create blank DB first')
 args = parser.parse_args()
 
 
