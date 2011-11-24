@@ -10,10 +10,13 @@ process.on('uncaughtException', function (err) {
 
 var express = require('express');
 var FastLegS = require('FastLegS');
+var fs = require('fs');
 
 // Express app creation
 
 var app = module.exports = express.createServer();
+
+var logFile = fs.createWriteStream('./logs/express.log', { flags: 'a+'});
 
 // FastLegS Config
 
@@ -89,6 +92,7 @@ app.configure(function(){
   app.set('views', __dirname + '/views');
   app.set('view engine', 'html');
   app.register('.html', require('jqtpl').express);
+  app.use(express.logger({stream: logFile}));
   app.use(express.bodyParser());
   app.use(express.methodOverride());
   app.use(express.cookieParser());
@@ -131,6 +135,10 @@ app.get('/', function(req, res){
   res.render('index', {
     title: 'Express'
   });
+});
+
+app.get('/about', function(req, res){
+  res.render('about', {});
 });
 
 app.get('/person/search/:person_name.:format?', function(req, res){
