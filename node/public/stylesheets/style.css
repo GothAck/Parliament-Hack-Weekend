@@ -19,6 +19,11 @@ a {
   margin: 0 auto 0 auto;
   padding: 1em; }
 
+.links a {
+  color: #333; }
+  .links a:hover {
+    color: #666; }
+
 .header img {
   max-height: 100px; }
 
