@@ -1,10 +1,11 @@
 {
-    "name": "application-name"
-  , "version": "0.0.1"
+    "name": parliamentary-my-dear"
+  , "version": "0.1.0"
   , "private": true
   , "dependencies": {
       "express": "2.4.2"
     , "sass": ">= 0.0.1"
     , "jqtpl": ">= 0.0.1"
+    , "FastLegS": ">= 0.1.2"
   }
 }
