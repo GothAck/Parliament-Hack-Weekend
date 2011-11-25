@@ -141,6 +141,10 @@ app.get('/about', function(req, res){
   res.render('about', {});
 });
 
+app.get('/about/presentation', function(req, res){
+  res.render('presentation', {});
+});
+
 app.get('/person/search/:person_name.:format?', function(req, res){
   res.render('people', {
     people: req.obs.People,
@@ -324,3 +328,9 @@ if (app.settings.env == 'production') {
   app.listen(3001);
 }
 console.log("Express server listening on port %d in %s mode", app.address().port, app.settings.env);
+
+//var repl = require('repl');
+
+//var c = repl.start();
+//c.context.FastLegS = FastLegS ;
+//c.context.Word = Word;
